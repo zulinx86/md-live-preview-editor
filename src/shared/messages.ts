@@ -27,7 +27,7 @@ export type HostToEditorMessage =
 	| { type: 'ackEdit'; version: number }
 	| { type: 'codeTokens'; blocks: CodeBlockTokens[] }
 	| { type: 'applyCss'; css: string }
-	| { type: 'jumpToLine'; line: number }
+	| { type: 'jumpToLine'; line: number; column?: number }
 	// Reply to `readDrawioFile`. `text` is the file's contents, or `error` says
 	// why it could not be read; exactly one of the two is set. `requestId`
 	// matches the reply to the widget that asked, since several diagrams in one

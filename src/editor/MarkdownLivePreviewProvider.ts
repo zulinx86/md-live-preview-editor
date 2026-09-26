@@ -49,6 +49,40 @@ export class MarkdownLivePreviewProvider implements vscode.CustomTextEditorProvi
 		});
 	}
 
+	/**
+	 * Open a Markdown file and navigate its preview to a source location.
+	 * @param uri Markdown file to open.
+	 * @param line One-based source line; positions past the document are clamped.
+	 * @param column One-based UTF-16 column, defaulting to the first column.
+	 * @returns Resolves when the target session has accepted the location.
+	 */
+	async openAtLocation(uri: vscode.Uri, line: number, column = 1): Promise<void> {
+		if (!Number.isSafeInteger(line) || line < 1 || !Number.isSafeInteger(column) || column < 1) {
+			throw new Error('Markdown locations require positive integer line and column numbers');
+		}
+		const group = vscode.window.tabGroups.activeTabGroup;
+		const input = group.activeTab?.input;
+		if (input instanceof vscode.TabInputText && input.uri.toString() === uri.toString()) {
+			await vscode.commands.executeCommand('reopenActiveEditorWith', MarkdownLivePreviewProvider.viewType);
+		} else {
+			await vscode.commands.executeCommand('vscode.openWith', uri, MarkdownLivePreviewProvider.viewType, {
+				viewColumn: group.viewColumn, preview: false, preserveFocus: false,
+			});
+		}
+		const session = this.findSession(uri, group.viewColumn);
+		if (!session) throw new Error('The Markdown preview session could not be opened');
+		session.jumpToLocation(line, column);
+	}
+
+	private findSession(uri: vscode.Uri, column: vscode.ViewColumn): DocumentSyncSession | undefined {
+		for (const session of this.sessions) {
+			if (session.getDocument().uri.toString() === uri.toString() && session.getViewColumn() === column) {
+				return session;
+			}
+		}
+		return undefined;
+	}
+
 	/** Called when the enabled CSS snippet set changes, to hot-reload every open panel. */
 	broadcastCssChanged(): void {
 		for (const session of this.sessions) {
@@ -67,11 +101,7 @@ export class MarkdownLivePreviewProvider implements vscode.CustomTextEditorProvi
 		if (!(input instanceof vscode.TabInputCustom) || input.viewType !== MarkdownLivePreviewProvider.viewType) {
 			return undefined;
 		}
-		const uriKey = input.uri.toString();
-		for (const session of this.sessions) {
-			if (session.getDocument().uri.toString() === uriKey) return session;
-		}
-		return undefined;
+		return this.findSession(input.uri, vscode.window.tabGroups.activeTabGroup.viewColumn);
 	}
 
 	/** Headings of the currently active Markdown Live Preview document, or `undefined` if none is active. */

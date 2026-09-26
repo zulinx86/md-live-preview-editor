@@ -30,6 +30,7 @@ import {
 import { t } from '../shared/i18n';
 import { adaptMarkdownCss } from '../shared/cssAdapter';
 import type { TextChange } from '../shared/messages';
+import { allowRevealOnce } from './cmUtils';
 
 const remoteChange = Annotation.define<boolean>();
 const FLUSH_DEBOUNCE_MS = 250;
@@ -258,8 +259,13 @@ onHostMessage((message) => {
 		case 'jumpToLine': {
 			if (!view) return;
 			const { doc } = view.state;
-			if (message.line < 1 || message.line > doc.lines) return;
-			const pos = doc.line(message.line).from;
+			if (!Number.isSafeInteger(message.line) || message.line < 1 || message.line > doc.lines) return;
+			const column = message.column ?? 1;
+			if (!Number.isSafeInteger(column) || column < 1) return;
+			const line = doc.line(message.line);
+			const pos = line.from + Math.min(column - 1, line.length);
+			// A requested source location is deliberate, unlike a stray block click.
+			allowRevealOnce();
 			view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
 			view.focus();
 			break;

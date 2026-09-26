@@ -4,6 +4,7 @@ import { StyleManagerViewProvider } from './sidebar/StyleManagerViewProvider';
 import { StyleStore } from './sidebar/styleStore';
 import { OutlineViewProvider } from './sidebar/OutlineViewProvider';
 import { setGrammarRoot } from './editor/shikiHost';
+import { MarkdownTerminalLinkProvider } from './editor/MarkdownTerminalLinkProvider';
 
 function getActiveMarkdownUri(): vscode.Uri | undefined {
 	if (vscode.window.activeTextEditor?.document.languageId === 'markdown') {
@@ -164,6 +165,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	context.subscriptions.push(vscode.window.registerWebviewViewProvider(OutlineViewProvider.viewType, outlineProvider));
 
 	context.subscriptions.push(
+		vscode.window.registerTerminalLinkProvider(new MarkdownTerminalLinkProvider((uri, line, column) =>
+			vscode.commands.executeCommand<void>('mdLivePreview.openAtLocation', uri, line, column))),
+		vscode.commands.registerCommand('mdLivePreview.openAtLocation', async (uri: vscode.Uri, line: number, column = 1) => {
+			// Use VS Code's existing document identity, including filesystem casing.
+			const document = await vscode.workspace.openTextDocument(uri);
+			sourceOverrideUris.delete(document.uri.toString());
+			await provider.openAtLocation(document.uri, line, column);
+		}),
 		vscode.commands.registerCommand('mdLivePreview.openWithLivePreview', async () => {
 			const uri = getActiveMarkdownUri();
 			if (!uri) return;
