@@ -1,5 +1,5 @@
 import { EditorState, Annotation, type Extension, ChangeSet } from '@codemirror/state';
-import { EditorView, keymap, drawSelection } from '@codemirror/view';
+import { EditorView, keymap, drawSelection, lineNumbers } from '@codemirror/view';
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import {
@@ -105,6 +105,7 @@ function createExtensions(): Extension[] {
 		// native selection cannot show.
 		EditorState.allowMultipleSelections.of(true),
 		drawSelection(),
+		lineNumbers(),
 		// Search matches the raw Markdown, which is what the file actually holds —
 		// so `](url)` and a table's pipes are findable even while the preview
 		// hides them. `searchRevealExtension` is what makes a match inside hidden

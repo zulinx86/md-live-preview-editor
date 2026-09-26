@@ -87,6 +87,9 @@ Opening a card's edit (pencil) icon shows the CSS file and a sample live preview
 
 To always open `.md` files in Live Preview, change the `mdLivePreview.defaultEditor` setting to `livePreview`.
 
+Source line numbers appear in the left gutter. Wrapped text keeps one number per
+source line; hidden fence lines and rendered blocks do not renumber later lines.
+
 ## Terminal File Links
 
 When `mdLivePreview.defaultEditor` is `livePreview`, this fork opens existing
