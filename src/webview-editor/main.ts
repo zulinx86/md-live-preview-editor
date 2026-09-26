@@ -266,7 +266,10 @@ onHostMessage((message) => {
 			const pos = line.from + Math.min(column - 1, line.length);
 			// A requested source location is deliberate, unlike a stray block click.
 			allowRevealOnce();
-			view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+			view.dispatch({
+				selection: { anchor: pos },
+				effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+			});
 			view.focus();
 			break;
 		}

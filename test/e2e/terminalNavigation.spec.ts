@@ -44,3 +44,19 @@ test('navigation reveals a table row after a previous cell click', async ({ page
 	await expect(page.locator('.mlp-table')).toHaveCount(0);
 	await expect(page.locator('.cm-line').filter({ hasText: '|---|---|' })).toBeInViewport();
 });
+
+
+test('jump centers the target line, including a line already in view', async ({ page }) => {
+	await mountEditor(page, documentText);
+	for (const line of [20, 90, 30]) {
+		await postToWebview(page, { type: 'jumpToLine', line, column: 4 });
+		await expect(page.locator('.cm-line').filter({ hasText: lines[line - 1] })).toBeInViewport();
+		await expect.poll(() => page.evaluate(() => {
+			const scroller = document.querySelector('.cm-scroller')!;
+			const viewport = scroller.getBoundingClientRect();
+			const cursor = document.querySelector('.cm-cursor')!.getBoundingClientRect();
+			return Math.abs((cursor.top + cursor.bottom) / 2
+				- (viewport.top + scroller.clientTop + scroller.clientHeight / 2));
+		})).toBeLessThan(2);
+	}
+});
