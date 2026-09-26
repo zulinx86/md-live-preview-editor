@@ -50,6 +50,48 @@ html, body {
 	overflow: hidden;
 }
 
+/* Changes from HEAD use VS Code's familiar added/modified/deleted colors. */
+.mlp-git-gutter {
+	width: 7px;
+}
+
+.mlp-git-gutter .cm-gutterElement {
+	position: relative;
+	padding: 0;
+}
+
+.mlp-git-marker {
+	display: block;
+	width: 3px;
+	height: 100%;
+	/* Changes in a collapsed fence still leave a small visible mark. */
+	min-height: 4px;
+}
+
+.mlp-git-added {
+	background: var(--vscode-editorGutter-addedBackground, #81b88b);
+}
+
+.mlp-git-modified {
+	background: var(--vscode-editorGutter-modifiedBackground, #569cd6);
+}
+
+.mlp-git-deleted {
+	position: absolute;
+	top: -4px;
+	width: 0;
+	height: 0;
+	min-height: 0;
+	border-top: 4px solid transparent;
+	border-bottom: 4px solid transparent;
+	border-left: 5px solid var(--vscode-editorGutter-deletedBackground, #f14c4c);
+}
+
+.mlp-git-deleted.mlp-git-after {
+	top: auto;
+	bottom: -4px;
+}
+
 /* Full-width, matching VS Code's built-in Markdown preview (no centered "page"
    column) — content fills the pane edge to edge with just breathing room on
    the sides. The `.cm-editor` prefix raises specificity above CodeMirror's own

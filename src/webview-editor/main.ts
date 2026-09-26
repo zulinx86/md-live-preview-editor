@@ -31,6 +31,7 @@ import { t } from '../shared/i18n';
 import { adaptMarkdownCss } from '../shared/cssAdapter';
 import type { TextChange } from '../shared/messages';
 import { allowRevealOnce } from './cmUtils';
+import { gitDiffGutter, setGitBase } from './gitDiffGutter';
 
 const remoteChange = Annotation.define<boolean>();
 const FLUSH_DEBOUNCE_MS = 250;
@@ -106,6 +107,7 @@ function createExtensions(): Extension[] {
 		EditorState.allowMultipleSelections.of(true),
 		drawSelection(),
 		lineNumbers(),
+		gitDiffGutter,
 		// Search matches the raw Markdown, which is what the file actually holds —
 		// so `](url)` and a table's pipes are findable even while the preview
 		// hides them. `searchRevealExtension` is what makes a match inside hidden
@@ -233,6 +235,7 @@ onHostMessage((message) => {
 			// files read for the previous one must not be served from cache.
 			clearDrawioFileCache();
 			resetView(message.text);
+			view?.dispatch({ effects: setGitBase.of(message.gitBase ?? null) });
 			break;
 		case 'ackEdit':
 			baseVersion = message.version;
@@ -251,6 +254,9 @@ onHostMessage((message) => {
 			baseVersion = message.version;
 			break;
 		}
+		case 'gitBase':
+			view?.dispatch({ effects: setGitBase.of(message.text) });
+			break;
 		case 'codeTokens':
 			view?.dispatch({ effects: setCodeTokens.of(message.blocks), annotations: remoteChange.of(true) });
 			break;

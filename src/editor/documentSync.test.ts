@@ -66,7 +66,7 @@ describe('DocumentSyncSession location delivery', () => {
 		ready();
 		expect(postMessage).toHaveBeenNthCalledWith(1, {
 			type: 'init', text: document.getText(), version: 7,
-			css: 'body { color: red; }', codeTheme: 'dark-plus', baseUri: 'webview://workspace/',
+			css: 'body { color: red; }', codeTheme: 'dark-plus', baseUri: 'webview://workspace/', gitBase: null,
 		});
 		expect(postMessage).toHaveBeenNthCalledWith(2, { type: 'jumpToLine', line: 2, column: 4 });
 		await Promise.resolve();
