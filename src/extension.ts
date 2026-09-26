@@ -168,15 +168,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			const uri = getActiveMarkdownUri();
 			if (!uri) return;
 			sourceOverrideUris.delete(uri.toString());
-			const viewColumn = vscode.window.tabGroups.activeTabGroup.viewColumn;
-			await vscode.commands.executeCommand('vscode.openWith', uri, MarkdownLivePreviewProvider.viewType, viewColumn);
+			// Reopen replaces the current tab instead of adding another editor tab.
+			await vscode.commands.executeCommand('reopenActiveEditorWith', MarkdownLivePreviewProvider.viewType);
 		}),
 		vscode.commands.registerCommand('mdLivePreview.openWithSource', async () => {
 			const uri = getActiveCustomEditorUri();
 			if (!uri) return;
 			sourceOverrideUris.add(uri.toString());
-			const viewColumn = vscode.window.tabGroups.activeTabGroup.viewColumn;
-			await vscode.commands.executeCommand('vscode.openWith', uri, 'default', viewColumn);
+			// Keep the source override set before reopening so the watcher leaves it alone.
+			await vscode.commands.executeCommand('reopenActiveEditorWith', 'default');
 		}),
 		vscode.commands.registerCommand('mdLivePreview.newStyle', async () => {
 			await styleManagerProvider.createNewStyle();
