@@ -87,6 +87,20 @@ Opening a card's edit (pencil) icon shows the CSS file and a sample live preview
 
 To always open `.md` files in Live Preview, change the `mdLivePreview.defaultEditor` setting to `livePreview`.
 
+## Terminal File Links
+
+When `mdLivePreview.defaultEditor` is `livePreview`, this fork opens existing
+`.md` and `.markdown` terminal links such as `docs/guide.md:42:3` at the requested
+source line and column in Live Preview. Both numbers are one-based; the column
+is optional. A new preview waits until its editor is ready before navigating.
+An already-open preview in the active editor group is reused.
+
+Absolute paths, `~/` paths, and `file:///` URIs are supported. Relative paths use
+the terminal's current directory reported by VS Code shell integration. When
+that directory is unavailable, relative links are left to VS Code's normal
+handling instead of guessing a workspace folder. Quote paths containing spaces,
+for example `"my notes/guide.md":42:3`.
+
 ## Settings
 
 | Setting | Description |

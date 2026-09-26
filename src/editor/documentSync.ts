@@ -50,6 +50,8 @@ export class DocumentSyncSession {
 	// applyEdit(): without this, its baseVersion check could run before the prior
 	// edit has actually bumped document.version, defeating the staleness guard.
 	private editQueue: Promise<void> = Promise.resolve();
+	private editorReady = false;
+	private pendingLocation: { line: number; column: number } | undefined;
 
 	constructor(
 		private readonly document: vscode.TextDocument,
@@ -83,6 +85,8 @@ export class DocumentSyncSession {
 		switch (message.type) {
 			case 'ready':
 				this.sendInit();
+				this.editorReady = true;
+				this.sendPendingLocation();
 				this.scheduleRehighlight(true);
 				break;
 			case 'edit':
@@ -343,8 +347,32 @@ export class DocumentSyncSession {
 		return this.document;
 	}
 
+	/** Return the column containing this panel for targeting a particular split. */
+	getViewColumn(): vscode.ViewColumn | undefined {
+		return this.webviewPanel.viewColumn;
+	}
+
+	/** Move to a one-based line, preserving outline navigation behavior. */
 	jumpToLine(line: number): void {
-		this.post({ type: 'jumpToLine', line });
+		this.jumpToLocation(line, 1);
+	}
+
+	/**
+	 * Request a one-based line and column, waiting for the webview's initial load.
+	 * @param line One-based source line.
+	 * @param column One-based UTF-16 column.
+	 */
+	jumpToLocation(line: number, column: number): void {
+		this.pendingLocation = { line, column };
+		this.sendPendingLocation();
+	}
+
+	private sendPendingLocation(): void {
+		if (!this.editorReady || !this.pendingLocation) return;
+		const { line, column } = this.pendingLocation;
+		this.pendingLocation = undefined;
+		const position = this.document.validatePosition(new vscode.Position(line - 1, column - 1));
+		this.post({ type: 'jumpToLine', line: position.line + 1, column: position.character + 1 });
 	}
 
 	dispose() {
