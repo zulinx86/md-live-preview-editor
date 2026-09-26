@@ -36,6 +36,20 @@ html, body {
 	line-height: 1.7;
 }
 
+/* Source line numbers share the preview background and use a muted color. */
+.cm-editor .cm-gutters {
+	background: inherit;
+	color: var(--vscode-editorLineNumber-foreground, #888ea9);
+	border-color: var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.2));
+}
+
+.cm-lineNumbers .cm-gutterElement {
+	padding-left: 0.75rem;
+	padding-right: 0.5rem;
+	/* A collapsed fence has zero height; do not paint its number over another line. */
+	overflow: hidden;
+}
+
 /* Full-width, matching VS Code's built-in Markdown preview (no centered "page"
    column) — content fills the pane edge to edge with just breathing room on
    the sides. The `.cm-editor` prefix raises specificity above CodeMirror's own
