@@ -125,6 +125,6 @@ export async function postToWebview(page: Page, message: unknown): Promise<void>
 /** Opens the find panel and waits for it to mount. */
 export async function openSearch(page: Page): Promise<void> {
 	await page.locator('.cm-content').click();
-	await page.keyboard.press('Control+f');
+	await page.keyboard.press('ControlOrMeta+f');
 	await page.waitForSelector('.cm-search');
 }
