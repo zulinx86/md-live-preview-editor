@@ -1370,15 +1370,10 @@ function buildDecorations(view: EditorView): DecorationSet {
 						const cursorAway = !cursorTouchesRange(state, node.from, node.to);
 						const firstLineNum = doc.lineAt(node.from).number;
 						const lastLineNum = doc.lineAt(node.to).number;
-						// The opening/closing ``` fence lines have no visible text once their
-						// marker is hidden (cursor away): leave them as plain, unstyled lines
-						// (same as any blank line elsewhere) instead of styling them as part of
-						// the code box, and move the rounded-corner/padding treatment onto the
-						// first/last line that still has real content. This avoids doubling the
-						// visible gap above/below the block, while keeping the fence line at its
-						// normal height so it stays clickable/navigable for editing the language
-						// tag. Skip this for an empty fence (no content lines at all) so there's
-						// still a box to show.
+						// Collapse inactive fence lines so only source blank lines separate
+						// the code box from surrounding text. Cursor/selection entry restores
+						// each fence for editing. Keep empty blocks visible, and never hide
+						// the last content line of a block with no closing fence.
 						const hasContentLines = lastLineNum > firstLineNum + 1;
 						const firstFenceHidden =
 							hasContentLines && !cursorTouchesRange(state, doc.line(firstLineNum).from, doc.line(firstLineNum).to);
@@ -1387,8 +1382,14 @@ function buildDecorations(view: EditorView): DecorationSet {
 						const firstContentLine = firstFenceHidden ? firstLineNum + 1 : firstLineNum;
 						const lastContentLine = lastFenceHidden ? lastLineNum - 1 : lastLineNum;
 						addLineRange(node.from, node.to, (n) => {
-							if (n === firstLineNum && firstFenceHidden) return '';
-							if (n === lastLineNum && lastFenceHidden) return '';
+							if (n === firstLineNum && firstFenceHidden) {
+								// A list marker can share the opening line; keep that marker visible.
+								const prefix = state.sliceDoc(doc.line(firstLineNum).from, node.from);
+								return prefix.trim() === '' ? 'mlp-line-code-fence' : '';
+							}
+							if (n === lastLineNum && lastFenceHidden) {
+								return node.node.lastChild?.name === 'CodeMark' ? 'mlp-line-code-fence' : '';
+							}
 							let cls = 'mlp-line-code';
 							if (n === firstContentLine) cls += ' mlp-line-code-first';
 							if (n === lastContentLine) cls += ' mlp-line-code-last';

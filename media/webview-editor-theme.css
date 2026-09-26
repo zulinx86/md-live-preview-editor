@@ -137,6 +137,11 @@ html, body {
    `.cm-line` block, so (unlike a mark) their padding and background never leak
    onto the inline syntax-token spans, and per-line backgrounds abut into one
    continuous block. */
+/* Source blank lines stay visible; only inactive fence lines collapse. */
+.cm-line.mlp-line-code-fence {
+	display: none;
+}
+
 .cm-line.mlp-line-code {
 	background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.09));
 	font-family: var(--vscode-editor-font-family, monospace);
