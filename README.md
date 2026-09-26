@@ -90,6 +90,16 @@ To always open `.md` files in Live Preview, change the `mdLivePreview.defaultEdi
 Source line numbers appear in the left gutter. Wrapped text keeps one number per
 source line; hidden fence lines and rendered blocks do not renumber later lines.
 
+The Git gutter compares the live document, including unsaved and staged changes,
+with the current branch's `HEAD`: green bars mark additions, blue bars mark
+modifications, and red pointers mark deleted lines. Rendered tables and diagrams
+use a block-level marker when an internal deletion cannot be positioned accurately;
+revealing the source shows the exact deletion boundary. The baseline refreshes after
+commits and branch changes through VS Code's built-in Git extension. Ignored files
+and files outside a Git repository have no markers. Very large differences may
+be omitted to keep typing responsive.
+
+
 ## Terminal File Links
 
 When `mdLivePreview.defaultEditor` is `livePreview`, this fork opens existing

@@ -4,6 +4,7 @@ import { pickCodeTheme, tokenizeDocument } from './shikiHost';
 import { extensionForMimeType, generateImageFileName } from '../shared/imageAssets';
 import { resolveLinkTarget } from '../shared/linkTarget';
 import { isPathInside } from '../shared/pathContainment';
+import { GitHeadTracker } from './GitHeadTracker';
 
 /**
  * Largest `.drawio` file that will be read and parsed.
@@ -51,6 +52,7 @@ export class DocumentSyncSession {
 	// edit has actually bumped document.version, defeating the staleness guard.
 	private editQueue: Promise<void> = Promise.resolve();
 	private editorReady = false;
+	private gitBase: string | null = null;
 	private pendingLocation: { line: number; column: number } | undefined;
 
 	constructor(
@@ -59,6 +61,12 @@ export class DocumentSyncSession {
 		private readonly getCss: () => string,
 	) {
 		this.lastAppliedVersion = document.version;
+		this.disposables.push(new GitHeadTracker(document.uri, (base) => {
+			if (base === this.gitBase) return;
+			this.gitBase = base;
+			if (this.editorReady) this.post({ type: 'gitBase', text: base });
+		}));
+
 
 		this.disposables.push(
 			webviewPanel.webview.onDidReceiveMessage((message: EditorToHostMessage) => this.handleMessage(message)),
@@ -255,6 +263,7 @@ export class DocumentSyncSession {
 			version: this.document.version,
 			css: this.getCss(),
 			codeTheme: pickCodeTheme(),
+			gitBase: this.gitBase,
 			baseUri: `${this.webviewPanel.webview.asWebviewUri(docDir).toString()}/`,
 		});
 		this.lastAppliedVersion = this.document.version;
