@@ -1214,8 +1214,14 @@ function buildDecorations(view: EditorView): DecorationSet {
 						}
 						return;
 					}
+					case 'CodeMark': {
+						// Whitespace after a backtick belongs to the text, not the marker.
+						if (!cursorTouchesRange(state, node.from, node.to)) {
+							pushReplace(node.from, node.to, hiddenMarkerDeco);
+						}
+						return;
+					}
 					case 'QuoteMark':
-					case 'CodeMark':
 					case 'CodeInfo': {
 						if (!cursorTouchesRange(state, node.from, node.to)) {
 							// Also swallow the single space after the marker so hidden markers
