@@ -137,6 +137,16 @@ describe('blockCursorTouchesRange', () => {
 	// does. Applying the guards to one that is already open made it flip back to
 	// its rendered form for an instant on every click inside it — visible as the
 	// source flashing to a table while it was being edited.
+	it('keeps revealed source open when a drag expands into a selection', () => {
+		const state = stateWithSelection(0);
+		const { from, to } = tableRange(state);
+		noteRevealed(from, to, true);
+		setPointerDownForTesting(true);
+		expect(blockCursorTouchesRange(stateWithSelection(from + 1, to - 1), from, to)).toBe(true);
+		setPointerDownForTesting(false);
+		expect(blockCursorTouchesRange(stateWithSelection(from + 1, to - 1), from, to)).toBe(true);
+	});
+
 	it('keeps a block open once its source is already showing', () => {
 		const state = stateWithSelection(0);
 		const { from, to } = tableRange(state);

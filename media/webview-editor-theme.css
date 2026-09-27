@@ -665,6 +665,12 @@ table.mlp-frontmatter {
 	width: 100%;
 	margin: 0; /* spacing lives on the `.mlp-block` wrapper — see above */
 }
+/* Rendered widgets are non-editable; explicitly allow native text selection. */
+table.mlp-frontmatter th, table.mlp-frontmatter td, .mlp-frontmatter-error {
+	cursor: text;
+	user-select: text;
+	-webkit-user-select: text;
+}
 table.mlp-frontmatter th, table.mlp-frontmatter td {
 	border: 1px solid rgba(127, 127, 127, 0.35);
 	padding: 5px 11px;
