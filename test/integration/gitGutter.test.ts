@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import * as ts from 'typescript';
+import { transformSync } from 'esbuild';
 
 type Tracker = new (uri: vscode.Uri, notify: (base: string | null) => void) => vscode.Disposable;
 interface Repository {
@@ -17,12 +17,12 @@ interface API {
 async function loadTracker(): Promise<Tracker> {
 	const extension = vscode.extensions.getExtension('t-shoot.markdown-live-preview-editor')!;
 	const source = await fs.readFile(path.join(extension.extensionPath, 'src/editor/GitHeadTracker.ts'), 'utf8');
-	const compiled = ts.transpileModule(source, {
-		compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-	}).outputText;
-	const exports: { GitHeadTracker?: Tracker } = {};
-	new Function('require', 'exports', compiled)(require, exports);
-	return exports.GitHeadTracker!;
+	const compiled = transformSync(source, {
+		loader: 'ts', format: 'cjs', target: 'es2022',
+	}).code;
+	const module: { exports: { GitHeadTracker?: Tracker } } = { exports: {} };
+	new Function('require', 'module', 'exports', compiled)(require, module, module.exports);
+	return module.exports.GitHeadTracker!;
 }
 
 async function waitFor(condition: () => boolean): Promise<void> {
