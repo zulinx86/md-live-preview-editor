@@ -233,7 +233,7 @@
     "@shikijs/langs": "^4.4.3",
     "@shikijs/themes": "^4.4.3",
     "diff": "9.0.0",
-    "entities": "4.5.0",
+    "entities": "8.1.0",
     "github-slugger": "2.0.0",
     "mermaid": "^11.4.1",
     "yaml": "^2.9.0"
