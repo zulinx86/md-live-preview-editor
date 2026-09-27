@@ -1,5 +1,6 @@
 import type { EditorState } from '@codemirror/state';
 import { EditorView, WidgetType } from '@codemirror/view';
+import { allowRevealOnce } from './cmUtils';
 import { wrapBlockWidget } from './blockWidgetWrap';
 import { withCodeModeButton } from './codeModeButton';
 import { t } from '../shared/i18n';
@@ -45,9 +46,37 @@ function formatValue(value: unknown): string {
 }
 
 function jumpToRange(view: EditorView, el: HTMLElement): void {
+	allowRevealOnce();
 	const pos = view.posAtDOM(el);
 	view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
 	view.focus();
+}
+
+/** Distinguishes a source-edit click from a native text-selection drag. */
+function enableTextSelection(view: EditorView, element: HTMLElement): void {
+	// A focusable widget owns its native selection. Leaving focus on the
+	// editor lets CodeMirror restore its source cursor during the drag.
+	element.tabIndex = -1;
+	let press: { x: number; y: number } | null = null;
+	element.addEventListener('mousedown', (event) => {
+		press = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
+		if (press) element.focus({ preventScroll: true });
+		// Leave the browser's selection gesture intact, but keep CodeMirror from
+		// moving the cursor into the replaced source on the initial press.
+		event.stopPropagation();
+	});
+	element.addEventListener('mouseup', (event) => {
+		const start = press;
+		press = null;
+		if (!start || event.button !== 0) return;
+		event.stopPropagation();
+		if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 4) return;
+		const selection = window.getSelection();
+		if (selection && !selection.isCollapsed &&
+			(element.contains(selection.anchorNode) || element.contains(selection.focusNode))) return;
+		event.preventDefault();
+		jumpToRange(view, element);
+	});
 }
 
 /** Renders a parsed frontmatter (1+ entries) as a key/value table. */
@@ -81,17 +110,15 @@ export class FrontmatterWidget extends WidgetType {
 			tbody.appendChild(tr);
 		}
 		table.appendChild(tbody);
-		table.addEventListener('mousedown', (event) => {
-			event.preventDefault();
-			jumpToRange(view, table);
-		});
+		enableTextSelection(view, table);
 		// Clicking the block already reveals the source; the button makes that
 		// route visible, and matches the one every other rendered block carries.
 		return wrapBlockWidget(withCodeModeButton(view, table, { anchor: table }));
 	}
 
 	ignoreEvent(): boolean {
-		return false;
+		// The widget handles clicks and native text selection itself.
+		return true;
 	}
 }
 
@@ -131,16 +158,14 @@ export class FrontmatterErrorWidget extends WidgetType {
 		const pre = document.createElement('pre');
 		pre.textContent = this.message;
 		container.append(strong, pre);
-		container.addEventListener('mousedown', (event) => {
-			event.preventDefault();
-			jumpToRange(view, container);
-		});
+		enableTextSelection(view, container);
 		// A parse error is exactly when the source needs reaching, so the button
 		// matters most here.
 		return wrapBlockWidget(withCodeModeButton(view, container, { anchor: container }));
 	}
 
 	ignoreEvent(): boolean {
-		return false;
+		// The widget handles clicks and native text selection itself.
+		return true;
 	}
 }

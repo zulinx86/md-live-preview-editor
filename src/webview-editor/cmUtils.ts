@@ -213,15 +213,6 @@ export function setPointerDownForTesting(value: boolean): void {
 export function blockCursorTouchesRange(state: EditorState, from: number, to: number): boolean {
 	const touching = cursorTouchesRange(state, from, to);
 	if (!touching) return false;
-	// Sweeping a selection across a block is a copy, not a request to edit it:
-	// unrendering mid-sweep replaces the rows being selected with pipe text and
-	// loses the selection. Inline constructs want the opposite (a drag across an
-	// image's `](url)` is how that URL gets selected), which is why this lives
-	// here rather than in `cursorTouchesRange`. A search match is the exception —
-	// it is a non-empty selection that explicitly asks to be shown.
-	if (!selectionIsSearchMatch(state) && state.selection.ranges.some((range) => !range.empty)) {
-		return false;
-	}
 	// A block already showing its source keeps showing it, whatever the mouse is
 	// doing. The guards below exist to stop a *rendered* block being revealed by
 	// a stray click; applying them to one that is already open made it flip back
@@ -231,6 +222,15 @@ export function blockCursorTouchesRange(state: EditorState, from: number, to: nu
 	// the DOM cannot answer this: while the source shows there is no widget under
 	// the pointer to hit-test.
 	if (revealedRanges.has(rangeKey(from, to))) return true;
+	// Sweeping a selection across a block is a copy, not a request to edit it:
+	// unrendering mid-sweep replaces the rows being selected with pipe text and
+	// loses the selection. Inline constructs want the opposite (a drag across an
+	// image's `](url)` is how that URL gets selected), which is why this lives
+	// here rather than in `cursorTouchesRange`. A search match is the exception —
+	// it is a non-empty selection that explicitly asks to be shown.
+	if (!selectionIsSearchMatch(state) && state.selection.ranges.some((range) => !range.empty)) {
+		return false;
+	}
 	// A gesture still in progress has not resolved into anything yet.
 	if (pointerDown) return false;
 	// The gesture touched a rendered block, so its caret is not a request to
