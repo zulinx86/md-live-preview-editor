@@ -87,6 +87,12 @@ Opening a card's edit (pencil) icon shows the CSS file and a sample live preview
 
 To always open `.md` files in Live Preview, change the `mdLivePreview.defaultEditor` setting to `livePreview`.
 
+Fragment links such as `[Details](#details)` jump to a heading in the current
+preview and center its source position where scrolling permits. Heading IDs use
+GitHub-style slugs, including Japanese text and numbered duplicate headings
+(`details`, `details-1`, ...). Percent-encoded fragments and reference links work
+as well. In a rendered table, use Ctrl/Cmd-click to follow the link.
+
 Source line numbers appear in the left gutter. Wrapped text keeps one number per
 source line; hidden fence lines and rendered blocks do not renumber later lines.
 
