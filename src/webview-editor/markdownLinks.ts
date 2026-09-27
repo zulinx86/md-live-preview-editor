@@ -107,3 +107,9 @@ export function getLinkReferences(state: EditorState): LinkReferences {
 	byParser.set(parser, references);
 	return references;
 }
+
+/** Returns the destination for a parser-recognized bare or angle autolink. */
+export function autolinkHref(text: string): string {
+	if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return text;
+	return text.startsWith('www.') ? `http://${text}` : `mailto:${text}`;
+}

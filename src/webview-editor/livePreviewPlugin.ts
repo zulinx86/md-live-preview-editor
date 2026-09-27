@@ -9,7 +9,7 @@ import { DrawioFileWidget } from './drawioWidget';
 import { wrapBlockWidget } from './blockWidgetWrap';
 import { detectFrontmatter } from './frontmatterWidget';
 import { renderInlineInto, type CellInlineHooks } from './tableCellInline';
-import { getLinkReferences, resolveMarkdownLink, type LinkReferences } from './markdownLinks';
+import { autolinkHref, getLinkReferences, resolveMarkdownLink, type LinkReferences } from './markdownLinks';
 import { createCodeModeButton, createCopyCodeButton } from './codeModeButton';
 import { insertRow, insertColumn, renderTableMarkdown, type TableEditModel } from './tableEdit';
 import { t } from '../shared/i18n';
@@ -853,7 +853,11 @@ class TableWidget extends WidgetType {
 
 		return wrapBlockWidget(wrap);
 	}
-	ignoreEvent(): boolean {
+	ignoreEvent(event: Event): boolean {
+		// Let modified link clicks reach the editor's shared link handler.
+		if (event instanceof MouseEvent && (event.type === 'mousedown' || event.type === 'click') &&
+			(event.ctrlKey || event.metaKey) && event.button === 0 &&
+			(event.target as HTMLElement | null)?.closest('.mlp-link')) return false;
 		// Every event the rendered table handles itself — text selection, cell
 		// clicks, and typing into a `contenteditable` cell — has to reach the DOM
 		// rather than being read by CodeMirror as an interaction with the widget's
@@ -1423,6 +1427,23 @@ function buildDecorations(view: EditorView): DecorationSet {
 							);
 						}
 						return; // descend to hide the ``` fence marks
+					}
+					case 'Autolink':
+					case 'URL': {
+						// Definition destinations are source metadata, not visible links.
+						if (node.node.parent?.name === 'LinkReference') return false;
+						const url = node.name === 'Autolink' ? node.node.getChild('URL') : node.node;
+						if (!url) return false;
+						const text = state.sliceDoc(url.from, url.to);
+						const href = autolinkHref(text);
+						decorations.push(
+							Decoration.mark({ tagName: 'a', class: 'mlp-link', attributes: { 'data-href': href } }).range(url.from, url.to),
+						);
+						if (!cursorTouchesRange(state, node.from, node.to)) {
+							if (node.from < url.from) pushReplace(node.from, url.from, hiddenMarkerDeco);
+							if (url.to < node.to) pushReplace(url.to, node.to, hiddenMarkerDeco);
+						}
+						return false;
 					}
 					case 'Link': {
 						const link = resolveMarkdownLink(node.node, (from, to) => state.sliceDoc(from, to), references);

@@ -1,6 +1,6 @@
 import { parser as baseMarkdownParser, Table, TaskList, Strikethrough, Autolink } from '@lezer/markdown';
 import type { SyntaxNode, Tree } from '@lezer/common';
-import { resolveMarkdownLink, type LinkReferences } from './markdownLinks';
+import { autolinkHref, resolveMarkdownLink, type LinkReferences } from './markdownLinks';
 
 const emptyReferences: LinkReferences = new Map();
 
@@ -145,11 +145,12 @@ function renderNode(parent: HTMLElement, node: SyntaxNode, src: string, hooks: C
 		case 'URL': {
 			// A bare or angle-bracketed URL the Autolink extension promoted.
 			const text = src.slice(node.from, node.to);
-			const href = text.replace(/^<|>$/g, '');
+			const label = text.replace(/^<|>$/g, '');
+			const href = autolinkHref(label);
 			const a = document.createElement('a');
 			a.className = 'mlp-link';
 			a.setAttribute('data-href', href);
-			a.textContent = href;
+			a.textContent = label;
 			parent.appendChild(a);
 			return;
 		}
