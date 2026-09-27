@@ -203,13 +203,24 @@ html, body {
 }
 
 .cm-line.mlp-line-code {
-	background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.09));
 	font-family: var(--vscode-editor-font-family, monospace);
 	padding-left: 1.1em;
 	padding-right: 1.1em;
 	/* Positioning root for the copy button, which is absolutely placed against
 	   the first content line's right edge. */
 	position: relative;
+}
+/* Paint only the background behind CodeMirror's selection layer (z-index -1).
+   The line itself must not create a stacking context: its text and controls
+   stay above the selection while this decoration stays below it. */
+.cm-line.mlp-line-code::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -2;
+	pointer-events: none;
+	border-radius: inherit;
+	background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.09));
 }
 .cm-line.mlp-line-code-first {
 	border-top-left-radius: 6px;

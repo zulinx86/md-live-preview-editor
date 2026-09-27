@@ -355,7 +355,20 @@ function combineEdge(pad: string | undefined, mar: string | undefined): string |
 }
 
 function emitBlockRule(selectors: string[], decls: string[]): string {
-	return decls.length ? `${selectors.join(', ')} {\n\t${decls.join(';\n\t')};\n}` : '';
+	selectors = selectors.flatMap((selector) => selector.split(',').map((part) => part.trim()));
+	const emit = (sels: string[], declarations: string[]) => sels.length && declarations.length
+		? `${sels.join(', ')} {\n\t${declarations.join(';\n\t')};\n}` : '';
+	// Code backgrounds live below the selection layer; text and box geometry
+	// remain on the line. Preserve background shorthands and longhands in order.
+	const code = selectors.filter((selector) => /\.mlp-line-code(?:\.mlp-line-code-(?:first|last))?$/.test(selector));
+	const background = decls.filter((decl) => /^background(?:-[\w-]+)?\s*:/i.test(decl));
+	if (!code.length || !background.length) return emit(selectors, decls);
+	const foreground = decls.filter((decl) => !background.includes(decl));
+	return [
+		emit(selectors.filter((selector) => !code.includes(selector)), decls),
+		emit(code, foreground),
+		emit(code.map((selector) => `${selector}::before`), background),
+	].filter(Boolean).join('\n');
 }
 
 function splitMultilineBlockRule(selectorList: string, body: string): string {
