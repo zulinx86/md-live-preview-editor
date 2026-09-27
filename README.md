@@ -2,9 +2,9 @@
 
 [日本語](#日本語) | English
 
-[![Version](https://img.shields.io/visual-studio-marketplace/v/t-shoot.markdown-live-preview-editor?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=t-shoot.markdown-live-preview-editor)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/t-shoot.markdown-live-preview-editor)](https://marketplace.visualstudio.com/items?itemName=t-shoot.markdown-live-preview-editor)
-[![Rating](https://img.shields.io/visual-studio-marketplace/r/t-shoot.markdown-live-preview-editor)](https://marketplace.visualstudio.com/items?itemName=t-shoot.markdown-live-preview-editor)
+[![Version](https://vsmarketplacebadges.dev/version/t-shoot.markdown-live-preview-editor.svg)](https://marketplace.visualstudio.com/items?itemName=t-shoot.markdown-live-preview-editor)
+[![Installs](https://vsmarketplacebadges.dev/installs/t-shoot.markdown-live-preview-editor.svg)](https://marketplace.visualstudio.com/items?itemName=t-shoot.markdown-live-preview-editor)
+[![Rating](https://vsmarketplacebadges.dev/rating/t-shoot.markdown-live-preview-editor.svg)](https://marketplace.visualstudio.com/items?itemName=t-shoot.markdown-live-preview-editor)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ![Live preview rendering syntax highlighting and a Mermaid diagram in place](media/screenshots/code-and-mermaid.png)
