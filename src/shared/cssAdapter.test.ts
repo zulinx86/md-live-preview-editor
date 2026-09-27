@@ -62,3 +62,31 @@ describe('adaptMarkdownCss', () => {
 		);
 	});
 });
+
+
+describe('code background selection layering', () => {
+	it('moves background declarations to the code decoration while preserving text styles', () => {
+		const css = adaptMarkdownCss('pre { background: #202020; background-color: #303030 !important; color: white; }');
+		expect(css).toContain('.cm-line.mlp-line-code::before {\n\tbackground: #202020;\n\tbackground-color: #303030 !important;');
+		expect(css).toContain('.cm-line.mlp-line-code {\n\tcolor: white;');
+	});
+
+	it('keeps non-code backgrounds on their original selectors in mixed block rules', () => {
+		const css = adaptMarkdownCss('pre, blockquote { background: red; padding: 10px; }');
+		expect(css).toContain('.cm-line.mlp-line-quote {\n\tbackground: red;');
+		expect(css).toContain('.cm-line.mlp-line-code::before {\n\tbackground: red;');
+		expect(css).toContain('.cm-line.mlp-line-code.mlp-line-code-first');
+	});
+});
+
+
+it('does not redirect existing code pseudo-element backgrounds again', () => {
+	const css = adaptMarkdownCss('.cm-line.mlp-line-code::before { background: red; }');
+	expect(css).not.toContain('::before::before');
+});
+
+it('does not move a heading background when grouped with pre', () => {
+	const css = adaptMarkdownCss('h1, pre { background: red; }');
+	expect(css).toContain('.cm-line.mlp-line-h1 {\n\tbackground: red;');
+	expect(css).toContain('.cm-line.mlp-line-code::before {\n\tbackground: red;');
+});
