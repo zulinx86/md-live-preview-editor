@@ -1,0 +1,63 @@
+name: Dependency audit
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Audit all dependencies
+        id: audit
+        run: npm audit --json > "$RUNNER_TEMP/npm-audit.json"
+      - name: Summarize audit
+        if: ${{ always() && steps.audit.outcome != 'skipped' }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/npm-audit.json`, 'utf8'));
+          const counts = report.metadata?.vulnerabilities;
+          const lines = [
+            '## Dependency Audit', '',
+            'Advisory check covering runtime and development dependencies. Not required for merge.', '',
+          ];
+          if (counts) {
+            lines.push(
+              `**${counts.total} affected packages**`, '',
+              '| Critical | High | Moderate | Low | Info |',
+              '| --- | --- | --- | --- | --- |',
+              `| ${counts.critical} | ${counts.high} | ${counts.moderate} | ${counts.low} | ${counts.info} |`,
+            );
+            if (counts.total > 0) {
+              const cell = value => String(value).replace(/[|\r\n]/g, ' ');
+              const severity = ['critical', 'high', 'moderate', 'low', 'info'];
+              const issues = Object.entries(report.vulnerabilities ?? {}).sort((a, b) =>
+                severity.indexOf(a[1].severity) - severity.indexOf(b[1].severity) || a[0].localeCompare(b[0]));
+              lines.push('', '### Affected Packages', '', '| Package | Severity | Dependency |', '| --- | --- | --- |');
+              for (const [name, issue] of issues) {
+                lines.push(`| ${cell(name)} | ${cell(issue.severity)} | ${issue.isDirect ? 'Direct' : 'Transitive'} |`);
+              }
+              console.log(`::warning title=Dependency audit::${counts.total} affected packages; ${counts.critical} critical, ${counts.high} high, ${counts.moderate} moderate, ${counts.low} low. Advisory only.`);
+            }
+          } else {
+            lines.push('**Audit did not complete.** See the audit output below.');
+          }
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          console.log(JSON.stringify(report, null, 2));
+          NODE
