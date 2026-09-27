@@ -9,6 +9,7 @@ import { DrawioFileWidget } from './drawioWidget';
 import { wrapBlockWidget } from './blockWidgetWrap';
 import { detectFrontmatter } from './frontmatterWidget';
 import { renderInlineInto, type CellInlineHooks } from './tableCellInline';
+import { getLinkReferences, resolveMarkdownLink, type LinkReferences } from './markdownLinks';
 import { createCodeModeButton, createCopyCodeButton } from './codeModeButton';
 import { insertRow, insertColumn, renderTableMarkdown, type TableEditModel } from './tableEdit';
 import { t } from '../shared/i18n';
@@ -342,7 +343,11 @@ export function sanitizeCellInput(text: string): string {
  * That keeps the rest of the row's text, padding and pipes byte-identical, so
  * an edit can neither reflow the source nor corrupt the table's structure.
  */
+// Reference maps are immutable and shared across selection-only updates.
+const referenceSignatures = new WeakMap<LinkReferences, string>();
+
 class TableWidget extends WidgetType {
+	private readonly referenceSignature: string;
 	constructor(
 		private readonly rows: string[][],
 		private readonly headerRowCount: number,
@@ -351,8 +356,15 @@ class TableWidget extends WidgetType {
 		private readonly tableFrom: number,
 		private readonly tableTo: number,
 		private readonly indent: string,
+		private readonly references: LinkReferences,
 	) {
 		super();
+		let signature = referenceSignatures.get(references);
+		if (signature === undefined) {
+			signature = JSON.stringify([...references]);
+			referenceSignatures.set(references, signature);
+		}
+		this.referenceSignature = signature;
 	}
 	eq(other: TableWidget): boolean {
 		return (
@@ -362,10 +374,12 @@ class TableWidget extends WidgetType {
 			JSON.stringify(other.cellRanges) === JSON.stringify(this.cellRanges) &&
 			other.tableFrom === this.tableFrom &&
 			other.tableTo === this.tableTo &&
-			other.indent === this.indent
+			other.indent === this.indent &&
+			other.referenceSignature === this.referenceSignature
 		);
 	}
 	toDOM(view: EditorView): HTMLElement {
+		const inlineHooks: CellInlineHooks = { ...cellInlineHooks, references: this.references };
 		const table = renderTableElement(
 			{
 				rows: this.rows,
@@ -376,7 +390,7 @@ class TableWidget extends WidgetType {
 				tableTo: this.tableTo,
 				indent: this.indent,
 			},
-			cellInlineHooks,
+			inlineHooks,
 		);
 		// Positioning root for the code-mode button, which floats over the table's
 		// top-right corner. The button can't hang off `.mlp-block` (the outer
@@ -468,7 +482,7 @@ class TableWidget extends WidgetType {
 				// a no-op onto the undo history, but the DOM currently holds the raw
 				// source text, so it still has to be restored.
 				cell.textContent = '';
-				renderInlineInto(cell, ref.source, cellInlineHooks);
+				renderInlineInto(cell, ref.source, inlineHooks);
 				return ref.to;
 			}
 			// The span was read from the document as it stood when this widget was
@@ -1095,7 +1109,7 @@ export function readTableModel(state: EditorState, tableNode: SyntaxNode): Table
 
 export function buildTableWidget(state: EditorState, node: SyntaxNodeRef): TableWidget {
 	const { rows, headerRowCount, align, cellRanges, tableFrom, tableTo, indent } = readTableModel(state, node.node);
-	return new TableWidget(rows, headerRowCount, align, cellRanges, tableFrom, tableTo, indent);
+	return new TableWidget(rows, headerRowCount, align, cellRanges, tableFrom, tableTo, indent, getLinkReferences(state));
 }
 
 /**
@@ -1142,6 +1156,7 @@ function buildDecorations(view: EditorView): DecorationSet {
 	const seenReplace = new Set<string>();
 	const seenLine = new Map<number, string>();
 	const tree = syntaxTree(state);
+	const references = getLinkReferences(state);
 	// blockDecorationsField renders the whole frontmatter block as its own
 	// widget; skip it here too so this pass doesn't waste time computing
 	// marks/line-classes for a range that block-level decoration will cover.
@@ -1410,16 +1425,21 @@ function buildDecorations(view: EditorView): DecorationSet {
 						return; // descend to hide the ``` fence marks
 					}
 					case 'Link': {
-						const marks = node.node.getChildren('LinkMark');
-						if (marks.length < 2) return;
-						const labelFrom = marks[0].to;
-						const labelTo = marks[1].from;
-						const urlNode = node.node.getChild('URL');
-						const href = urlNode ? state.sliceDoc(urlNode.from, urlNode.to) : '';
+						const link = resolveMarkdownLink(node.node, (from, to) => state.sliceDoc(from, to), references);
+						// Unresolved references keep their brackets and any nested emphasis.
+						if (!link) return;
+						const { labelFrom, labelTo, href, title } = link;
+						const cursorAway = !cursorTouchesRange(state, node.from, node.to);
+						if (labelFrom === labelTo) {
+							if (cursorAway) pushReplace(node.from, node.to, hiddenMarkerDeco);
+							return false;
+						}
+						const attributes: Record<string, string> = { 'data-href': href };
+						if (title !== undefined) attributes.title = title;
 						decorations.push(
-							Decoration.mark({ tagName: 'a', class: 'mlp-link', attributes: { 'data-href': href } }).range(labelFrom, labelTo),
+							Decoration.mark({ tagName: 'a', class: 'mlp-link', attributes }).range(labelFrom, labelTo),
 						);
-						if (!cursorTouchesRange(state, node.from, node.to)) {
+						if (cursorAway) {
 							if (labelFrom > node.from) pushReplace(node.from, labelFrom, hiddenMarkerDeco);
 							if (node.to > labelTo) pushReplace(labelTo, node.to, hiddenMarkerDeco);
 						}

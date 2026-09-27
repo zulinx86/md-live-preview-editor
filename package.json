@@ -233,6 +233,7 @@
     "@shikijs/langs": "^1.24.0",
     "@shikijs/themes": "^1.24.0",
     "diff": "9.0.0",
+    "entities": "4.5.0",
     "mermaid": "^11.4.1",
     "yaml": "^2.9.0"
   }
