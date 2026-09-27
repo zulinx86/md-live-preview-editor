@@ -6,7 +6,7 @@
  * unit-tested directly.
  */
 export type LinkTarget =
-	/** Nothing to open — a `#heading` link points inside this document. */
+	/** Nothing for the host to open — fragment links are handled in the webview. */
 	| { kind: 'ignore' }
 	/** Already carries a scheme (`https:`, `mailto:`, …): hand it to the shell. */
 	| { kind: 'external'; href: string }

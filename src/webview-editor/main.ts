@@ -32,6 +32,7 @@ import { adaptMarkdownCss } from '../shared/cssAdapter';
 import type { TextChange } from '../shared/messages';
 import { allowRevealOnce } from './cmUtils';
 import { gitDiffGutter, setGitBase } from './gitDiffGutter';
+import { findFragmentPosition } from './fragmentNavigation';
 
 const remoteChange = Annotation.define<boolean>();
 const FLUSH_DEBOUNCE_MS = 250;
@@ -78,6 +79,26 @@ function applyUserCss(css: string) {
 	styleEl.textContent = adaptMarkdownCss(css);
 }
 
+function jumpToPosition(editor: EditorView, pos: number): void {
+	allowRevealOnce();
+	editor.dispatch({
+		selection: { anchor: pos },
+		effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+	});
+	editor.focus();
+}
+
+function openLink(href: string): void {
+	const target = href.trim();
+	if (target.startsWith('#')) {
+		if (!view) return;
+		const pos = findFragmentPosition(view.state, target);
+		if (pos !== null) jumpToPosition(view, pos);
+		return;
+	}
+	postToHost({ type: 'openLink', href });
+}
+
 function createExtensions(): Extension[] {
 	const markdownSupport = markdown({ extensions: GFM });
 	return [
@@ -95,7 +116,7 @@ function createExtensions(): Extension[] {
 		blockDecorationsField,
 		dragReleaseRefresh,
 		codeHighlightExtension,
-		createLinkClickHandler((href) => postToHost({ type: 'openLink', href })),
+		createLinkClickHandler(openLink),
 		createImagePasteHandler((atPos, mimeType, dataBase64, needsOwnParagraph) =>
 			postToHost({ type: 'pasteImage', atPos, mimeType, dataBase64, needsOwnParagraph }),
 		),
@@ -272,12 +293,7 @@ onHostMessage((message) => {
 			const line = doc.line(message.line);
 			const pos = line.from + Math.min(column - 1, line.length);
 			// A requested source location is deliberate, unlike a stray block click.
-			allowRevealOnce();
-			view.dispatch({
-				selection: { anchor: pos },
-				effects: EditorView.scrollIntoView(pos, { y: 'center' }),
-			});
-			view.focus();
+			jumpToPosition(view, pos);
 			break;
 		}
 		case 'setCursor': {
