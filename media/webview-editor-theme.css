@@ -95,11 +95,15 @@ html, body {
 /* Full-width, matching VS Code's built-in Markdown preview (no centered "page"
    column) — content fills the pane edge to edge with just breathing room on
    the sides. The `.cm-editor` prefix raises specificity above CodeMirror's own
-   injected `.cm-content` rules so the padding wins. `clamp` keeps comfortable
+   injected `.cm-content` rules so the spacing wins. `clamp` keeps comfortable
    side gutters on wide screens without cramping narrow (e.g. side-by-side)
    layouts. */
 .cm-editor .cm-content {
-	padding: 1.5rem clamp(1rem, 3.5vw, 2.5rem) 40vh;
+	/* Selection rectangles use the content border box, ignoring its horizontal
+	   padding. Keep side spacing outside that box so multiline selections start
+	   at the text column rather than extending into the blank gutter. */
+	margin-inline: clamp(1rem, 3.5vw, 2.5rem);
+	padding: 1.5rem 0 40vh;
 	/* Prefer the theme's dedicated cursor color; fall back to the editor's own
 	   foreground (guaranteed to contrast with --vscode-editor-background,
 	   unlike a hardcoded gray which can vanish against a light theme) rather
