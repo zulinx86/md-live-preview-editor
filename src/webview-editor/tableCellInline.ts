@@ -1,5 +1,8 @@
 import { parser as baseMarkdownParser, Table, TaskList, Strikethrough, Autolink } from '@lezer/markdown';
 import type { SyntaxNode, Tree } from '@lezer/common';
+import { resolveMarkdownLink, type LinkReferences } from './markdownLinks';
+
+const emptyReferences: LinkReferences = new Map();
 
 // A table cell's content is plain text as far as CodeMirror is concerned — the
 // rich TableWidget builds its own DOM outside the editor, so the live-preview
@@ -42,6 +45,7 @@ function unescapePunctuation(text: string): string {
 }
 
 export interface CellInlineHooks {
+	references?: LinkReferences;
 	/** Resolves an image's `src` for display (webview base-URI rewriting). */
 	resolveImageSrc: (src: string) => string;
 }
@@ -66,11 +70,15 @@ function readLinkParts(node: SyntaxNode, src: string): { label: string; url: str
  * Renders the children of an inline container into `parent`, filling the gaps
  * between recognised children with their literal text.
  */
-function renderChildren(parent: HTMLElement, node: SyntaxNode, src: string, hooks: CellInlineHooks): void {
+function renderChildren(parent: HTMLElement, node: SyntaxNode, src: string, hooks: CellInlineHooks, preserveLinkSyntax = false): void {
 	let pos = node.from;
 	for (let child = node.firstChild; child; child = child.nextSibling) {
 		if (child.from > pos) appendText(parent, unescapePunctuation(src.slice(pos, child.from)));
-		renderNode(parent, child, src, hooks);
+		if (preserveLinkSyntax && (child.name === 'LinkMark' || child.name === 'LinkLabel')) {
+			appendText(parent, unescapePunctuation(src.slice(child.from, child.to)));
+		} else {
+			renderNode(parent, child, src, hooks);
+		}
 		pos = child.to;
 	}
 	if (pos < node.to) appendText(parent, unescapePunctuation(src.slice(pos, node.to)));
@@ -117,14 +125,19 @@ function renderNode(parent: HTMLElement, node: SyntaxNode, src: string, hooks: C
 			return;
 		}
 		case 'Link': {
-			const { label, url, title } = readLinkParts(node, src);
+			const link = resolveMarkdownLink(node, (from, to) => src.slice(from, to), hooks.references ?? emptyReferences);
+			if (!link) {
+				renderChildren(parent, node, src, hooks, true);
+				return;
+			}
+			const { href, title, labelFrom, labelTo } = link;
 			const a = document.createElement('a');
 			a.className = 'mlp-link';
-			a.setAttribute('data-href', url);
+			a.setAttribute('data-href', href);
 			if (title) a.title = title;
 			// A link label is itself inline markup ("[**bold** label](u)"), so
 			// render it rather than assigning it as text.
-			renderInlineInto(a, label, hooks);
+			renderInlineInto(a, src.slice(labelFrom, labelTo), hooks);
 			parent.appendChild(a);
 			return;
 		}
