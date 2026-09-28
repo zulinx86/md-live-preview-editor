@@ -6,6 +6,12 @@ export interface TextChange {
 	insert: string;
 }
 
+/** Anchor and active end as UTF-16 offsets in the Markdown document. */
+export interface SelectionOffsets {
+	anchor: number;
+	head: number;
+}
+
 export interface CodeToken {
 	from: number;
 	to: number;
@@ -30,6 +36,8 @@ export type HostToEditorMessage =
 	| { type: 'gitBase'; text: string | null }
 	| { type: 'jumpToLine'; line: number; column?: number }
 	| { type: 'jumpToFragment'; fragment: string }
+	| { type: 'restoreSelection'; selection: SelectionOffsets }
+	| { type: 'requestSelection'; requestId: number }
 	// Reply to `readDrawioFile`. `text` is the file's contents, or `error` says
 	// why it could not be read; exactly one of the two is set. `requestId`
 	// matches the reply to the widget that asked, since several diagrams in one
@@ -39,6 +47,7 @@ export type HostToEditorMessage =
 
 export type EditorToHostMessage =
 	| { type: 'ready' }
+	| { type: 'selection'; requestId: number; selection: SelectionOffsets }
 	| { type: 'edit'; baseVersion: number; changes: TextChange[] }
 	| { type: 'undo' }
 	| { type: 'redo' }

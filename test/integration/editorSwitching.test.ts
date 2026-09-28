@@ -68,6 +68,67 @@ suite('in-place editor switching', () => {
 		}
 	});
 
+	for (const reversed of [false, true]) {
+		test(`source round trip preserves ${reversed ? 'reversed primary selection' : 'cursor position'} with Unicode`, async () => {
+			const source = vscode.window.activeTextEditor!;
+			const originalText = source.document.getText();
+			const text = '# 日本語 😀 heading\n\nBefore 🦊 café é after.\nLast line.\n';
+			try {
+				await source.edit((edit) => edit.replace(
+					new vscode.Range(source.document.positionAt(0), source.document.positionAt(originalText.length)), text,
+				));
+				const head = text.indexOf('café');
+				const anchor = reversed ? text.indexOf('Last') + 4 : head;
+				source.selections = [
+					new vscode.Selection(source.document.positionAt(anchor), source.document.positionAt(head)),
+					new vscode.Selection(0, 2, 0, 2),
+				];
+				const expectedReversed = source.selection.isReversed;
+				await vscode.commands.executeCommand('mdLivePreview.openWithLivePreview');
+				await vscode.commands.executeCommand('mdLivePreview.openWithSource');
+				const restored = vscode.window.activeTextEditor!;
+				assert.strictEqual(restored.document.uri.toString(), files[1].toString());
+				assert.strictEqual(restored.document.offsetAt(restored.selection.anchor), anchor);
+				assert.strictEqual(restored.document.offsetAt(restored.selection.active), head);
+				assert.strictEqual(restored.selection.isReversed, expectedReversed);
+			} finally {
+				const document = await vscode.workspace.openTextDocument(files[1]);
+				const edit = new vscode.WorkspaceEdit();
+				edit.replace(files[1], new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), originalText);
+				await vscode.workspace.applyEdit(edit);
+				await document.save();
+			}
+		});
+	}
+
+	test('switching to source preserves the preview cursor location', async () => {
+		const source = vscode.window.activeTextEditor!;
+		source.selection = new vscode.Selection(0, 1, 0, 1);
+		await vscode.commands.executeCommand('mdLivePreview.openAtLocation', files[1], 3, 4);
+		await vscode.commands.executeCommand('mdLivePreview.openWithSource');
+		await waitFor(() => vscode.window.activeTextEditor?.document.uri.toString() === files[1].toString());
+		assert.strictEqual(vscode.window.activeTextEditor!.selection.active.line, 2);
+		assert.strictEqual(vscode.window.activeTextEditor!.selection.active.character, 3);
+	});
+
+	test('repeated toggle commands do not race selection capture or create tabs', async () => {
+		const source = vscode.window.activeTextEditor!;
+		source.selection = new vscode.Selection(2, 3, 2, 3);
+		const group = vscode.window.tabGroups.activeTabGroup;
+		const order = group.tabs.map(tabUri);
+		await Promise.all([
+			vscode.commands.executeCommand('mdLivePreview.openWithLivePreview'),
+			vscode.commands.executeCommand('mdLivePreview.openWithLivePreview'),
+		]);
+		await Promise.all([
+			vscode.commands.executeCommand('mdLivePreview.openWithSource'),
+			vscode.commands.executeCommand('mdLivePreview.openWithSource'),
+		]);
+		assert.deepStrictEqual(group.tabs.map(tabUri), order);
+		assert.strictEqual(vscode.window.activeTextEditor!.selection.active.line, 2);
+		assert.strictEqual(vscode.window.activeTextEditor!.selection.active.character, 3);
+	});
+
 	test('an explicit source choice is not reopened by livePreview mode', async () => {
 		await vscode.commands.executeCommand('mdLivePreview.openWithLivePreview');
 		await config().update('defaultEditor', 'livePreview', vscode.ConfigurationTarget.Global);

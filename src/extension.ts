@@ -19,7 +19,7 @@ function getActiveMarkdownUri(): vscode.Uri | undefined {
 
 function getActiveCustomEditorUri(): vscode.Uri | undefined {
 	const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
-	if (input instanceof vscode.TabInputCustom) {
+	if (input instanceof vscode.TabInputCustom && input.viewType === MarkdownLivePreviewProvider.viewType) {
 		return input.uri;
 	}
 	return undefined;
@@ -29,6 +29,10 @@ function getActiveCustomEditorUri(): vscode.Uri | undefined {
 // exempted from the auto-reopen-as-Live-Preview watcher below until closed or
 // reopened in Live Preview again. Keyed by `Uri#toString()`.
 const sourceOverrideUris = new Set<string>();
+
+// Both directions share this guard so repeated toggles cannot dispose a
+// preview while its selection and pending edits are still being captured.
+let switchingEditor = false;
 
 // URIs currently being converted to Live Preview by `maybeReopenAsLivePreview`.
 // `onDidChangeTabs` can report the same tab open in both its `opened` and
@@ -174,18 +178,62 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			await provider.openAtLocation(document.uri, line, column);
 		}),
 		vscode.commands.registerCommand('mdLivePreview.openWithLivePreview', async () => {
+			if (switchingEditor) return;
 			const uri = getActiveMarkdownUri();
 			if (!uri) return;
-			sourceOverrideUris.delete(uri.toString());
-			// Reopen replaces the current tab instead of adding another editor tab.
-			await vscode.commands.executeCommand('reopenActiveEditorWith', MarkdownLivePreviewProvider.viewType);
+			switchingEditor = true;
+			try {
+				const editor = vscode.window.activeTextEditor;
+				const selection = editor?.document.uri.toString() === uri.toString()
+					? {
+						anchor: editor.document.offsetAt(editor.selection.anchor),
+						head: editor.document.offsetAt(editor.selection.active),
+					}
+					: undefined;
+				sourceOverrideUris.delete(uri.toString());
+				if (selection) {
+					await provider.openAtSelection(uri, selection);
+				} else {
+					await vscode.commands.executeCommand('reopenActiveEditorWith', MarkdownLivePreviewProvider.viewType);
+				}
+			} finally {
+				switchingEditor = false;
+			}
 		}),
 		vscode.commands.registerCommand('mdLivePreview.openWithSource', async () => {
+			if (switchingEditor) return;
 			const uri = getActiveCustomEditorUri();
 			if (!uri) return;
-			sourceOverrideUris.add(uri.toString());
-			// Keep the source override set before reopening so the watcher leaves it alone.
-			await vscode.commands.executeCommand('reopenActiveEditorWith', 'default');
+			const group = vscode.window.tabGroups.activeTabGroup;
+			const tab = group.activeTab;
+			const column = group.viewColumn;
+			switchingEditor = true;
+			try {
+				const selection = await provider.captureSelection(uri, column);
+				// Capture can wait for renderer readiness and edits. Never replace
+				// a different tab if the user navigated elsewhere in the meantime.
+				if (vscode.window.tabGroups.activeTabGroup !== group || group.activeTab !== tab
+					|| group.viewColumn !== column) return;
+				sourceOverrideUris.add(uri.toString());
+				// Set the override before reopening so the watcher leaves source alone.
+				await vscode.commands.executeCommand('reopenActiveEditorWith', 'default');
+				const activeInput = group.activeTab?.input;
+				if (vscode.window.tabGroups.activeTabGroup !== group
+					|| !(activeInput instanceof vscode.TabInputText || activeInput instanceof vscode.TabInputCustom)
+					|| activeInput.uri.toString() !== uri.toString()) return;
+				let editor = vscode.window.visibleTextEditors.find((candidate) =>
+					candidate.document.uri.toString() === uri.toString() && candidate.viewColumn === column);
+				if (!editor) {
+					editor = await vscode.window.showTextDocument(uri, { viewColumn: column, preview: false });
+				}
+				editor.selection = new vscode.Selection(
+					editor.document.positionAt(selection.anchor),
+					editor.document.positionAt(selection.head),
+				);
+				editor.revealRange(editor.selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+			} finally {
+				switchingEditor = false;
+			}
 		}),
 		vscode.commands.registerCommand('mdLivePreview.newStyle', async () => {
 			await styleManagerProvider.createNewStyle();

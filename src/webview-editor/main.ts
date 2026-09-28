@@ -284,6 +284,27 @@ onHostMessage((message) => {
 		case 'applyCss':
 			applyUserCss(message.css);
 			break;
+		case 'requestSelection': {
+			if (!view) return;
+			flushNow();
+			const { anchor, head } = view.state.selection.main;
+			postToHost({ type: 'selection', requestId: message.requestId, selection: { anchor, head } });
+			break;
+		}
+		case 'restoreSelection': {
+			if (!view) return;
+			const { anchor, head } = message.selection;
+			if (!Number.isSafeInteger(anchor) || !Number.isSafeInteger(head)) return;
+			const length = view.state.doc.length;
+			const clamp = (offset: number) => Math.min(Math.max(offset, 0), length);
+			allowRevealOnce();
+			view.dispatch({
+				selection: { anchor: clamp(anchor), head: clamp(head) },
+				effects: EditorView.scrollIntoView(clamp(head), { y: 'center' }),
+			});
+			view.focus();
+			break;
+		}
 		case 'jumpToFragment': {
 			if (!view) return;
 			const pos = findFragmentPosition(view.state, message.fragment);
