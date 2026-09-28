@@ -32,6 +32,7 @@ import { adaptMarkdownCss } from '../shared/cssAdapter';
 import type { TextChange } from '../shared/messages';
 import { allowRevealOnce } from './cmUtils';
 import { gitDiffGutter, setGitBase } from './gitDiffGutter';
+import { sectionFolding } from './sectionFolding';
 import { findFragmentPosition } from './fragmentNavigation';
 
 const remoteChange = Annotation.define<boolean>();
@@ -84,6 +85,7 @@ function jumpToPosition(editor: EditorView, pos: number): void {
 	editor.dispatch({
 		selection: { anchor: pos },
 		effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+		userEvent: 'select.jump',
 	});
 	editor.focus();
 }
@@ -129,6 +131,7 @@ function createExtensions(): Extension[] {
 		drawSelection(),
 		lineNumbers(),
 		gitDiffGutter,
+		sectionFolding,
 		// Search matches the raw Markdown, which is what the file actually holds —
 		// so `](url)` and a table's pipes are findable even while the preview
 		// hides them. `searchRevealExtension` is what makes a match inside hidden
@@ -301,6 +304,7 @@ onHostMessage((message) => {
 			view.dispatch({
 				selection: { anchor: clamp(anchor), head: clamp(head) },
 				effects: EditorView.scrollIntoView(clamp(head), { y: 'center' }),
+				userEvent: 'select.restore',
 			});
 			view.focus();
 			break;
@@ -326,7 +330,7 @@ onHostMessage((message) => {
 		case 'setCursor': {
 			if (!view) return;
 			const pos = Math.max(0, Math.min(message.pos, view.state.doc.length));
-			view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+			view.dispatch({ selection: { anchor: pos }, scrollIntoView: true, userEvent: 'select.jump' });
 			break;
 		}
 	}

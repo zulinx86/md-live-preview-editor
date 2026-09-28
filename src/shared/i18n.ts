@@ -13,6 +13,8 @@
 
 /** Every user-visible webview string, keyed by a stable identifier. */
 const en = {
+	'section.collapse': 'Collapse section',
+	'section.expand': 'Expand section',
 	'code.toggle.title': 'Code mode: show the Markdown source and edit it directly',
 	'code.toggle.aria': 'Switch to code mode',
 	'code.copy.title': 'Copy this code block',
@@ -120,6 +122,8 @@ const en = {
 export type MessageKey = keyof typeof en;
 
 const ja: Record<MessageKey, string> = {
+	'section.collapse': 'セクションを折りたたむ',
+	'section.expand': 'セクションを展開する',
 	'code.toggle.title': 'コードモード：Markdown ソースを表示して直接編集します',
 	'code.toggle.aria': 'コードモードに切り替え',
 	'code.copy.title': 'このコードブロックをコピーします',
