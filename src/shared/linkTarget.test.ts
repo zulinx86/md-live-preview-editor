@@ -19,8 +19,10 @@ describe('resolveLinkTarget', () => {
 			expect(resolveLinkTarget(href)).toEqual({ kind: 'relative', path: href });
 		});
 
-		it('strips a trailing fragment so it cannot land in the filename', () => {
-			expect(resolveLinkTarget('guide.md#installation')).toEqual({ kind: 'relative', path: 'guide.md' });
+		it('separates the fragment from the filename without discarding it', () => {
+			expect(resolveLinkTarget('../doing/decide-flights.md#deliverable')).toEqual({
+				kind: 'relative', path: '../doing/decide-flights.md', fragment: '#deliverable',
+			});
 		});
 
 		it('decodes percent-encoding, since the filesystem wants the real name', () => {
@@ -48,4 +50,15 @@ describe('resolveLinkTarget', () => {
 			expect(resolveLinkTarget(href)).toEqual({ kind: 'ignore' });
 		});
 	});
+});
+
+
+it('preserves encoded fragments while decoding only the filename', () => {
+	expect(resolveLinkTarget('my%20note%23draft.md#%E6%88%90%E6%9E%9C')).toEqual({
+		kind: 'relative', path: 'my note#draft.md', fragment: '#%E6%88%90%E6%9E%9C',
+	});
+});
+
+it('preserves an empty fragment as a request for the file start', () => {
+	expect(resolveLinkTarget('guide.md#')).toEqual({ kind: 'relative', path: 'guide.md', fragment: '#' });
 });

@@ -284,6 +284,12 @@ onHostMessage((message) => {
 		case 'applyCss':
 			applyUserCss(message.css);
 			break;
+		case 'jumpToFragment': {
+			if (!view) return;
+			const pos = findFragmentPosition(view.state, message.fragment);
+			if (pos !== null) jumpToPosition(view, pos);
+			break;
+		}
 		case 'jumpToLine': {
 			if (!view) return;
 			const { doc } = view.state;

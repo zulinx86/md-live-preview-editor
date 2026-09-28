@@ -40,7 +40,10 @@ export class MarkdownLivePreviewProvider implements vscode.CustomTextEditorProvi
 		};
 		webviewPanel.webview.html = this.buildHtml(webviewPanel.webview);
 
-		const session = new DocumentSyncSession(document, webviewPanel, this.getCss);
+		const session = new DocumentSyncSession(
+			document, webviewPanel, this.getCss,
+			(uri, fragment) => this.openAtFragment(uri, fragment),
+		);
 		this.sessions.add(session);
 
 		webviewPanel.onDidDispose(() => {
@@ -60,6 +63,23 @@ export class MarkdownLivePreviewProvider implements vscode.CustomTextEditorProvi
 		if (!Number.isSafeInteger(line) || line < 1 || !Number.isSafeInteger(column) || column < 1) {
 			throw new Error('Markdown locations require positive integer line and column numbers');
 		}
+		const session = await this.openPreview(uri);
+		session.jumpToLocation(line, column);
+	}
+
+	/**
+	 * Open a Markdown file and navigate its preview to a fragment.
+	 * @param uri Markdown file to open; resolved to its canonical document URI.
+	 * @param fragment Heading fragment to deliver to the preview.
+	 * @returns Resolves when the target session has accepted the fragment.
+	 */
+	async openAtFragment(uri: vscode.Uri, fragment: string): Promise<void> {
+		const document = await vscode.workspace.openTextDocument(uri);
+		const session = await this.openPreview(document.uri);
+		session.jumpToFragment(fragment);
+	}
+
+	private async openPreview(uri: vscode.Uri): Promise<DocumentSyncSession> {
 		const group = vscode.window.tabGroups.activeTabGroup;
 		const input = group.activeTab?.input;
 		if (input instanceof vscode.TabInputText && input.uri.toString() === uri.toString()) {
@@ -71,7 +91,7 @@ export class MarkdownLivePreviewProvider implements vscode.CustomTextEditorProvi
 		}
 		const session = this.findSession(uri, group.viewColumn);
 		if (!session) throw new Error('The Markdown preview session could not be opened');
-		session.jumpToLocation(line, column);
+		return session;
 	}
 
 	private findSession(uri: vscode.Uri, column: vscode.ViewColumn): DocumentSyncSession | undefined {

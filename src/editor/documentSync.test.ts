@@ -13,8 +13,17 @@ vi.mock('vscode', () => ({
 	Uri: {
 		joinPath: vi.fn(() => ({ toString: () => 'file:///workspace' })),
 	},
-	workspace: { onDidChangeTextDocument: vi.fn(() => ({ dispose: vi.fn() })) },
-	window: { onDidChangeActiveColorTheme: vi.fn(() => ({ dispose: vi.fn() })) },
+	workspace: {
+		onDidChangeTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
+		fs: { stat: vi.fn().mockResolvedValue({ type: 1 }) },
+	},
+	commands: { executeCommand: vi.fn().mockResolvedValue(undefined) },
+	env: { openExternal: vi.fn().mockResolvedValue(true) },
+	l10n: { t: (message: string) => message },
+	window: {
+		onDidChangeActiveColorTheme: vi.fn(() => ({ dispose: vi.fn() })),
+		showWarningMessage: vi.fn(),
+	},
 }));
 
 vi.mock('./shikiHost', () => ({
@@ -50,9 +59,13 @@ function createSession(text = 'first\n📚 notes\nlast') {
 			asWebviewUri: () => ({ toString: () => 'webview://workspace' }),
 		},
 	} as unknown as vscode.WebviewPanel;
-	const session = new DocumentSyncSession(document, panel, () => 'body { color: red; }');
+	const openMarkdownFragment = vi.fn<(uri: vscode.Uri, fragment: string) => Promise<void>>().mockResolvedValue(undefined);
+	const session = new DocumentSyncSession(document, panel, () => 'body { color: red; }', openMarkdownFragment);
 	sessions.push(session);
-	return { session, postMessage, validatePosition, document, ready: () => receive({ type: 'ready' }) };
+	return { session, postMessage, validatePosition, document, openMarkdownFragment,
+		ready: () => receive({ type: 'ready' }),
+		openLink: (href: string) => receive({ type: 'openLink', href }),
+	};
 }
 
 beforeEach(() => { vi.clearAllMocks(); });
@@ -128,4 +141,78 @@ describe('DocumentSyncSession location delivery', () => {
 		ready();
 		expect(postMessage).toHaveBeenNthCalledWith(2, { type: 'jumpToLine', line: 2, column: 1 });
 	});
+});
+
+
+describe('DocumentSyncSession fragment navigation', () => {
+	it('delivers a fragment after the destination has received init', () => {
+		const { session, postMessage, ready } = createSession();
+		session.jumpToFragment('#deliverable');
+		expect(postMessage).not.toHaveBeenCalled();
+		ready();
+		expect(postMessage.mock.calls[0][0].type).toBe('init');
+		expect(postMessage).toHaveBeenNthCalledWith(2, { type: 'jumpToFragment', fragment: '#deliverable' });
+	});
+
+	it('delivers immediately to an existing ready destination', () => {
+		const { session, postMessage, ready } = createSession();
+		ready();
+		postMessage.mockClear();
+		session.jumpToFragment('#deliverable');
+		expect(postMessage).toHaveBeenCalledExactlyOnceWith({ type: 'jumpToFragment', fragment: '#deliverable' });
+	});
+
+	it('uses the latest request when line and fragment navigation overlap', () => {
+		const first = createSession();
+		first.session.jumpToLocation(2, 3);
+		first.session.jumpToFragment('#deliverable');
+		first.ready();
+		expect(first.postMessage.mock.calls[1][0]).toEqual({ type: 'jumpToFragment', fragment: '#deliverable' });
+		const second = createSession();
+		second.session.jumpToFragment('#deliverable');
+		second.session.jumpToLocation(2, 3);
+		second.ready();
+		expect(second.postMessage.mock.calls[1][0]).toEqual({ type: 'jumpToLine', line: 2, column: 3 });
+	});
+
+	it.each(['destination.md', 'destination.MD', 'destination.markdown'])('opens %s with its fragment', async (filename) => {
+		const { openLink, openMarkdownFragment, document } = createSession();
+		const directory = { path: '/workspace', toString: () => 'file:///workspace' } as vscode.Uri;
+		const destination = { path: `/workspace/${filename}`, toString: () => `file:///workspace/${filename}` } as vscode.Uri;
+		vi.mocked(vscode.Uri.joinPath).mockReturnValueOnce(directory).mockReturnValueOnce(destination);
+		openLink(`${filename}#deliverable`);
+		await vi.waitFor(() => expect(openMarkdownFragment).toHaveBeenCalledExactlyOnceWith(destination, '#deliverable'));
+		expect(vscode.Uri.joinPath).toHaveBeenCalledWith(document.uri, '..');
+		expect(vscode.Uri.joinPath).toHaveBeenCalledWith(directory, filename);
+		expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
+	});
+
+	it('keeps ordinary file links on the existing open path', async () => {
+		const { openLink, openMarkdownFragment } = createSession();
+		const destination = { path: '/workspace/destination.md', toString: () => 'file:///workspace/destination.md' } as vscode.Uri;
+		vi.mocked(vscode.Uri.joinPath).mockReturnValueOnce(destination).mockReturnValueOnce(destination);
+		openLink('destination.md');
+		await vi.waitFor(() => expect(vscode.commands.executeCommand).toHaveBeenCalledWith('vscode.open', destination));
+		expect(openMarkdownFragment).not.toHaveBeenCalled();
+	});
+
+	it('reports a missing destination without attempting a fragment jump', async () => {
+		const { openLink, openMarkdownFragment } = createSession();
+		vi.mocked(vscode.workspace.fs.stat).mockRejectedValueOnce(new Error('Not found'));
+		openLink('missing.md#deliverable');
+		await vi.waitFor(() => expect(vscode.window.showWarningMessage).toHaveBeenCalled());
+		expect(openMarkdownFragment).not.toHaveBeenCalled();
+		expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
+	});
+});
+
+
+it('reports a preview-open failure instead of opening the Markdown file externally', async () => {
+	const { openLink, openMarkdownFragment } = createSession();
+	const destination = { path: '/workspace/destination.md', toString: () => 'file:///workspace/destination.md' } as vscode.Uri;
+	vi.mocked(vscode.Uri.joinPath).mockReturnValueOnce(destination).mockReturnValueOnce(destination);
+	openMarkdownFragment.mockRejectedValueOnce(new Error('Preview failed'));
+	openLink('destination.md#deliverable');
+	await vi.waitFor(() => expect(vscode.window.showWarningMessage).toHaveBeenCalled());
+	expect(vscode.env.openExternal).not.toHaveBeenCalled();
 });

@@ -53,12 +53,13 @@ export class DocumentSyncSession {
 	private editQueue: Promise<void> = Promise.resolve();
 	private editorReady = false;
 	private gitBase: string | null = null;
-	private pendingLocation: { line: number; column: number } | undefined;
+	private pendingNavigation: Extract<HostToEditorMessage, { type: 'jumpToLine' | 'jumpToFragment' }> | undefined;
 
 	constructor(
 		private readonly document: vscode.TextDocument,
 		private readonly webviewPanel: vscode.WebviewPanel,
 		private readonly getCss: () => string,
+		private readonly openMarkdownFragment: (uri: vscode.Uri, fragment: string) => Promise<void>,
 	) {
 		this.lastAppliedVersion = document.version;
 		this.disposables.push(new GitHeadTracker(document.uri, (base) => {
@@ -94,7 +95,7 @@ export class DocumentSyncSession {
 			case 'ready':
 				this.sendInit();
 				this.editorReady = true;
-				this.sendPendingLocation();
+				this.sendPendingNavigation();
 				this.scheduleRehighlight(true);
 				break;
 			case 'edit':
@@ -198,6 +199,14 @@ export class DocumentSyncSession {
 			await vscode.workspace.fs.stat(uri);
 		} catch {
 			void vscode.window.showWarningMessage(vscode.l10n.t('Link target not found: {0}', target.path));
+			return;
+		}
+		if (target.fragment !== undefined && /\.(md|markdown)$/i.test(uri.path)) {
+			try {
+				await this.openMarkdownFragment(uri, target.fragment);
+			} catch {
+				void vscode.window.showWarningMessage(vscode.l10n.t('Cannot open Markdown link: {0}', target.path));
+			}
 			return;
 		}
 		try {
@@ -372,15 +381,25 @@ export class DocumentSyncSession {
 	 * @param column One-based UTF-16 column.
 	 */
 	jumpToLocation(line: number, column: number): void {
-		this.pendingLocation = { line, column };
-		this.sendPendingLocation();
+		this.pendingNavigation = { type: 'jumpToLine', line, column };
+		this.sendPendingNavigation();
 	}
 
-	private sendPendingLocation(): void {
-		if (!this.editorReady || !this.pendingLocation) return;
-		const { line, column } = this.pendingLocation;
-		this.pendingLocation = undefined;
-		const position = this.document.validatePosition(new vscode.Position(line - 1, column - 1));
+	/** Resolve an encoded #fragment in the destination view after its initial load. */
+	jumpToFragment(fragment: string): void {
+		this.pendingNavigation = { type: 'jumpToFragment', fragment };
+		this.sendPendingNavigation();
+	}
+
+	private sendPendingNavigation(): void {
+		if (!this.editorReady || !this.pendingNavigation) return;
+		const navigation = this.pendingNavigation;
+		this.pendingNavigation = undefined;
+		if (navigation.type === 'jumpToFragment') {
+			this.post(navigation);
+			return;
+		}
+		const position = this.document.validatePosition(new vscode.Position(navigation.line - 1, (navigation.column ?? 1) - 1));
 		this.post({ type: 'jumpToLine', line: position.line + 1, column: position.character + 1 });
 	}
 
