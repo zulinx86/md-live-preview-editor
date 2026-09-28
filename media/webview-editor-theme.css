@@ -50,6 +50,45 @@ html, body {
 	overflow: hidden;
 }
 
+/* Keep section controls separate from source line numbers and Git markers. */
+.mlp-section-fold-gutter .cm-gutterElement {
+	display: flex;
+	align-items: center;
+	overflow: hidden;
+}
+.mlp-section-fold-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--vscode-editor-foreground, #cdd6e0);
+	cursor: pointer;
+}
+.mlp-section-fold-toggle svg {
+	width: 18px;
+	height: 18px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2.5;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+.mlp-section-fold-toggle[aria-expanded="true"] svg {
+	transform: rotate(90deg);
+}
+.mlp-section-fold-toggle:hover {
+	background: var(--vscode-button-secondaryHoverBackground, #454545);
+}
+.mlp-section-fold-toggle:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder, #007fd4);
+	outline-offset: 2px;
+}
+
 /* Changes from HEAD use VS Code's familiar added/modified/deleted colors. */
 .mlp-git-gutter {
 	width: 7px;
