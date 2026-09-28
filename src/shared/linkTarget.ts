@@ -10,8 +10,8 @@ export type LinkTarget =
 	| { kind: 'ignore' }
 	/** Already carries a scheme (`https:`, `mailto:`, …): hand it to the shell. */
 	| { kind: 'external'; href: string }
-	/** A path relative to the document's own folder, with its fragment removed. */
-	| { kind: 'relative'; path: string };
+	/** A decoded file path and optional encoded fragment for the destination. */
+	| { kind: 'relative'; path: string; fragment?: string };
 
 /**
  * A scheme is a letter followed by at least one more letter/digit/`+`/`-`/`.`
@@ -26,7 +26,7 @@ export function resolveLinkTarget(href: string): LinkTarget {
 	if (!trimmed || trimmed.startsWith('#')) return { kind: 'ignore' };
 	if (SCHEME_RE.test(trimmed)) return { kind: 'external', href: trimmed };
 
-	// Drop a trailing `#fragment` so it cannot end up inside the filename, and
+	// Separate `#fragment` so it can be delivered after opening the file, and
 	// undo percent-encoding — a Markdown link to a file whose name contains a
 	// space is normally written `my%20note.md`, and the filesystem wants the
 	// space back.
@@ -39,5 +39,5 @@ export function resolveLinkTarget(href: string): LinkTarget {
 	} catch {
 		// Malformed escapes (a bare `%` in a filename): use the path as written.
 	}
-	return { kind: 'relative', path };
+	return { kind: 'relative', path, ...(hash === -1 ? {} : { fragment: trimmed.slice(hash) }) };
 }

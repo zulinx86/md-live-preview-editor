@@ -10,5 +10,6 @@
   "Files outside the document folder cannot be read.": "ドキュメントのフォルダ外のファイルは読み込めません。",
   "The file is too large (over 5MB).": "ファイルが大きすぎます（5MB を超えています）。",
   "Cannot read the file: {0}": "ファイルを読み込めません: {0}",
-  "Link target not found: {0}": "リンク先が見つかりません: {0}"
+  "Link target not found: {0}": "リンク先が見つかりません: {0}",
+  "Cannot open Markdown link: {0}": "Markdown のリンク先を開けません: {0}"
 }
