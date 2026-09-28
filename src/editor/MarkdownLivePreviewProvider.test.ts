@@ -28,6 +28,8 @@ vi.mock('./documentSync', () => ({
 			getViewColumn: () => panel.viewColumn,
 			jumpToFragment: vi.fn(),
 			jumpToLocation: vi.fn(),
+			restoreSelection: vi.fn(),
+			captureSelection: vi.fn(),
 			dispose: vi.fn(),
 		};
 	}),
@@ -207,5 +209,82 @@ describe('MarkdownLivePreviewProvider location navigation', () => {
 			{ viewColumn: 2, preview: false, preserveFocus: false },
 		);
 		expect(destination.jumpToLocation).toHaveBeenCalledExactlyOnceWith(999, 1);
+	});
+});
+
+
+describe('MarkdownLivePreviewProvider selection switching', () => {
+	it('reopens source in place before restoring a reversed selection', async () => {
+		setActive(new vscode.TabInputText(target));
+		let destination!: DocumentSyncSession;
+		executeCommand.mockImplementation(async () => { destination = resolvePreview().session; });
+		const selection = { anchor: 18, head: 4 };
+		await provider.openAtSelection(target, selection);
+		expect(executeCommand).toHaveBeenCalledExactlyOnceWith(
+			'reopenActiveEditorWith', MarkdownLivePreviewProvider.viewType,
+		);
+		expect(destination.restoreSelection).toHaveBeenCalledExactlyOnceWith(selection);
+		expect(openTextDocument).not.toHaveBeenCalled();
+	});
+
+	it('restores only the destination document in the active group', async () => {
+		const otherGroup = resolvePreview(target, 1).session;
+		const otherDocument = resolvePreview(source).session;
+		const destination = resolvePreview().session;
+		await provider.openAtSelection(target, { anchor: 7, head: 7 });
+		expect(executeCommand).toHaveBeenCalledExactlyOnceWith(
+			'vscode.openWith', target, MarkdownLivePreviewProvider.viewType,
+			{ viewColumn: 2, preview: false, preserveFocus: false },
+		);
+		expect(destination.restoreSelection).toHaveBeenCalledExactlyOnceWith({ anchor: 7, head: 7 });
+		expect(otherGroup.restoreSelection).not.toHaveBeenCalled();
+		expect(otherDocument.restoreSelection).not.toHaveBeenCalled();
+	});
+
+	it('captures the requested document and group even when another tab is active', async () => {
+		const destination = resolvePreview(target, 1).session;
+		const otherGroup = resolvePreview().session;
+		const otherDocument = resolvePreview(source, 1).session;
+		setActive(new vscode.TabInputCustom(source, MarkdownLivePreviewProvider.viewType));
+		const selection = { anchor: 18, head: 4 };
+		vi.mocked(destination.captureSelection).mockResolvedValue(selection);
+		await expect(provider.captureSelection(target, 1)).resolves.toEqual(selection);
+		expect(destination.captureSelection).toHaveBeenCalledExactlyOnceWith();
+		expect(otherGroup.captureSelection).not.toHaveBeenCalled();
+		expect(otherDocument.captureSelection).not.toHaveBeenCalled();
+		expect(executeCommand).not.toHaveBeenCalled();
+	});
+
+	it('rejects capture when no matching session exists', async () => {
+		resolvePreview(target, 1);
+		resolvePreview(source);
+		await expect(provider.captureSelection(target, 2)).rejects.toThrow(
+			'The Markdown preview session could not be found',
+		);
+	});
+
+	it('does not capture a disposed session', async () => {
+		const { session, onDidDispose } = resolvePreview();
+		onDidDispose.mock.calls[0][0]();
+		await expect(provider.captureSelection(target, 2)).rejects.toThrow(
+			'The Markdown preview session could not be found',
+		);
+		expect(session.captureSelection).not.toHaveBeenCalled();
+	});
+
+	it('propagates capture failure without reopening the editor', async () => {
+		const destination = resolvePreview().session;
+		const error = new Error('Preview closed during capture');
+		vi.mocked(destination.captureSelection).mockRejectedValue(error);
+		await expect(provider.captureSelection(target, 2)).rejects.toBe(error);
+		expect(executeCommand).not.toHaveBeenCalled();
+	});
+
+	it('propagates preview-open failure without restoring selection', async () => {
+		const destination = resolvePreview().session;
+		const error = new Error('Unable to open editor');
+		executeCommand.mockRejectedValueOnce(error);
+		await expect(provider.openAtSelection(target, { anchor: 0, head: 0 })).rejects.toBe(error);
+		expect(destination.restoreSelection).not.toHaveBeenCalled();
 	});
 });

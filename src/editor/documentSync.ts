@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { EditorToHostMessage, HostToEditorMessage, TextChange } from '../shared/messages';
+import type { EditorToHostMessage, HostToEditorMessage, TextChange, SelectionOffsets } from '../shared/messages';
 import { pickCodeTheme, tokenizeDocument } from './shikiHost';
 import { extensionForMimeType, generateImageFileName } from '../shared/imageAssets';
 import { resolveLinkTarget } from '../shared/linkTarget';
@@ -29,6 +29,7 @@ function isInside(dir: vscode.Uri, target: vscode.Uri): boolean {
 }
 
 const REHIGHLIGHT_DEBOUNCE_MS = 150;
+const SELECTION_REQUEST_TIMEOUT_MS = 10_000;
 
 /**
  * Owns the sync relationship between one vscode.TextDocument and one webview panel
@@ -53,7 +54,16 @@ export class DocumentSyncSession {
 	private editQueue: Promise<void> = Promise.resolve();
 	private editorReady = false;
 	private gitBase: string | null = null;
-	private pendingNavigation: Extract<HostToEditorMessage, { type: 'jumpToLine' | 'jumpToFragment' }> | undefined;
+	private pendingNavigation: Extract<HostToEditorMessage, { type: 'jumpToLine' | 'jumpToFragment' | 'restoreSelection' }> | undefined;
+
+	private disposed = false;
+	private nextSelectionRequestId = 0;
+	private readonly selectionRequests = new Map<number, {
+		resolve: (selection: SelectionOffsets) => void;
+		reject: (error: Error) => void;
+		timer: ReturnType<typeof setTimeout>;
+		sent: boolean;
+	}>();
 
 	constructor(
 		private readonly document: vscode.TextDocument,
@@ -96,7 +106,11 @@ export class DocumentSyncSession {
 				this.sendInit();
 				this.editorReady = true;
 				this.sendPendingNavigation();
+				this.scheduleSelectionRequests();
 				this.scheduleRehighlight(true);
+				break;
+			case 'selection':
+				void this.receiveSelection(message.requestId, message.selection);
 				break;
 			case 'edit':
 				this.editQueue = this.editQueue.catch(() => undefined).then(() => this.applyEdit(message.changes, message.baseVersion));
@@ -265,6 +279,8 @@ export class DocumentSyncSession {
 	}
 
 	private sendInit() {
+		// A response from the previous document snapshot cannot safely restore a cursor.
+		this.rejectSelectionRequests(new Error('The Markdown preview changed while capturing its cursor; try switching again'), true);
 		const docDir = vscode.Uri.joinPath(this.document.uri, '..');
 		this.post({
 			type: 'init',
@@ -391,11 +407,79 @@ export class DocumentSyncSession {
 		this.sendPendingNavigation();
 	}
 
+	/** Restore the source editor's primary selection once the preview is ready. */
+	restoreSelection(selection: SelectionOffsets): void {
+		this.pendingNavigation = { type: 'restoreSelection', selection };
+		this.sendPendingNavigation();
+	}
+
+	/** Capture the preview selection after flushing its pending document edits. */
+	captureSelection(): Promise<SelectionOffsets> {
+		if (this.disposed) return Promise.reject(new Error('The Markdown preview is closed'));
+		const requestId = ++this.nextSelectionRequestId;
+		return new Promise((resolve, reject) => {
+			const timer = setTimeout(() => {
+				this.selectionRequests.delete(requestId);
+				reject(new Error('The Markdown preview did not respond with its cursor position'));
+			}, SELECTION_REQUEST_TIMEOUT_MS);
+			this.selectionRequests.set(requestId, { resolve, reject, timer, sent: false });
+			this.scheduleSelectionRequests();
+		});
+	}
+
+	private rejectSelectionRequests(error: Error, sentOnly = false): void {
+		for (const [requestId, request] of this.selectionRequests) {
+			if (sentOnly && !request.sent) continue;
+			clearTimeout(request.timer);
+			this.selectionRequests.delete(requestId);
+			request.reject(error);
+		}
+	}
+
+	private scheduleSelectionRequests(): void {
+		if (!this.editorReady || this.disposed || this.selectionRequests.size === 0) return;
+		// Both initial readiness and later captures wait for queued edits and undo.
+		void this.editQueue.then(() => this.sendSelectionRequests()).catch((error) => {
+			this.rejectSelectionRequests(error instanceof Error ? error : new Error(String(error)));
+		});
+	}
+
+	private sendSelectionRequests(): void {
+		if (!this.editorReady || this.disposed) return;
+		for (const [requestId, request] of this.selectionRequests) {
+			if (request.sent) continue;
+			request.sent = true;
+			this.post({ type: 'requestSelection', requestId });
+		}
+	}
+
+	private async receiveSelection(requestId: number, selection: SelectionOffsets): Promise<void> {
+		const request = this.selectionRequests.get(requestId);
+		if (!request?.sent) return;
+		try {
+			// The webview sends pending edits before its selection response. Wait
+			// for those edits so offsets are interpreted against the updated text.
+			await this.editQueue;
+			if (this.selectionRequests.get(requestId) !== request) return;
+			if (!selection || !Number.isSafeInteger(selection.anchor) || !Number.isSafeInteger(selection.head)) {
+				throw new Error('The Markdown preview returned an invalid cursor position');
+			}
+			const length = this.document.getText().length;
+			const clamp = (offset: number) => Math.min(Math.max(offset, 0), length);
+			request.resolve({ anchor: clamp(selection.anchor), head: clamp(selection.head) });
+		} catch (error) {
+			request.reject(error instanceof Error ? error : new Error(String(error)));
+		} finally {
+			clearTimeout(request.timer);
+			this.selectionRequests.delete(requestId);
+		}
+	}
+
 	private sendPendingNavigation(): void {
 		if (!this.editorReady || !this.pendingNavigation) return;
 		const navigation = this.pendingNavigation;
 		this.pendingNavigation = undefined;
-		if (navigation.type === 'jumpToFragment') {
+		if (navigation.type !== 'jumpToLine') {
 			this.post(navigation);
 			return;
 		}
@@ -404,6 +488,8 @@ export class DocumentSyncSession {
 	}
 
 	dispose() {
+		this.disposed = true;
+		this.rejectSelectionRequests(new Error('The Markdown preview was closed before switching completed'));
 		if (this.rehighlightTimer) {
 			clearTimeout(this.rehighlightTimer);
 		}

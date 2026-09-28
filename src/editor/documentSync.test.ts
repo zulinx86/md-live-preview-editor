@@ -65,6 +65,7 @@ function createSession(text = 'first\n📚 notes\nlast') {
 	return { session, postMessage, validatePosition, document, openMarkdownFragment,
 		ready: () => receive({ type: 'ready' }),
 		openLink: (href: string) => receive({ type: 'openLink', href }),
+		receive: (message: EditorToHostMessage) => receive(message),
 	};
 }
 
@@ -215,4 +216,138 @@ it('reports a preview-open failure instead of opening the Markdown file external
 	openLink('destination.md#deliverable');
 	await vi.waitFor(() => expect(vscode.window.showWarningMessage).toHaveBeenCalled());
 	expect(vscode.env.openExternal).not.toHaveBeenCalled();
+});
+
+
+describe('DocumentSyncSession selection capture', () => {
+	it('restores source selection before answering a capture queued during initial load', async () => {
+		const { session, ready, receive, postMessage } = createSession();
+		const selection = { anchor: 12, head: 7 };
+		session.restoreSelection(selection);
+		const captured = session.captureSelection();
+		expect(postMessage).not.toHaveBeenCalled();
+		ready();
+		await Promise.resolve();
+		expect(postMessage.mock.calls.slice(0, 3).map(([message]) => message.type)).toEqual([
+			'init', 'restoreSelection', 'requestSelection',
+		]);
+		const request = postMessage.mock.calls[2][0];
+		if (request.type !== 'requestSelection') throw new Error('Expected capture request');
+		receive({ type: 'selection', requestId: request.requestId, selection });
+		await expect(captured).resolves.toEqual(selection);
+	});
+
+	it('waits for flushed edits before interpreting the captured offsets', async () => {
+		const { session, ready, receive, postMessage, document } = createSession();
+		ready();
+		let release!: () => void;
+		const edit = new Promise<void>((resolve) => { release = resolve; });
+		vi.spyOn(session as unknown as { applyEdit: () => Promise<void> }, 'applyEdit').mockReturnValueOnce(edit);
+		const captured = session.captureSelection();
+		await Promise.resolve();
+		const request = postMessage.mock.calls.map(([message]) => message).find(message => message.type === 'requestSelection')!;
+		if (request.type !== 'requestSelection') throw new Error('Expected capture request');
+		receive({ type: 'edit', baseVersion: 7, changes: [{ from: 0, to: 0, insert: 'new text' }] });
+		receive({ type: 'selection', requestId: request.requestId, selection: { anchor: 22, head: 22 } });
+		let resolved = false;
+		void captured.then(() => { resolved = true; });
+		await Promise.resolve();
+		expect(resolved).toBe(false);
+		vi.spyOn(document, 'getText').mockReturnValue('new text first\n📚 notes\nlast');
+		release();
+		await expect(captured).resolves.toEqual({ anchor: 22, head: 22 });
+	});
+
+	it('waits for already queued edits before requesting the view selection', async () => {
+		const { session, ready, receive, postMessage } = createSession();
+		ready();
+		postMessage.mockClear();
+		let release!: () => void;
+		const edit = new Promise<void>((resolve) => { release = resolve; });
+		vi.spyOn(session as unknown as { applyEdit: () => Promise<void> }, 'applyEdit').mockReturnValueOnce(edit);
+		receive({ type: 'edit', baseVersion: 7, changes: [] });
+		const captured = session.captureSelection();
+		await Promise.resolve();
+		expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'requestSelection' }));
+		release();
+		await vi.waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'requestSelection' })));
+		const request = postMessage.mock.calls.map(([message]) => message).find(message => message.type === 'requestSelection')!;
+		if (request.type !== 'requestSelection') throw new Error('Expected capture request');
+		receive({ type: 'selection', requestId: request.requestId, selection: { anchor: 3, head: 1 } });
+		await expect(captured).resolves.toEqual({ anchor: 3, head: 1 });
+	});
+
+	it('ignores unrelated responses and clamps offsets to the updated document', async () => {
+		const { session, ready, receive, postMessage, document } = createSession();
+		ready();
+		const captured = session.captureSelection();
+		await Promise.resolve();
+		const request = postMessage.mock.calls.map(([message]) => message).find(message => message.type === 'requestSelection')!;
+		if (request.type !== 'requestSelection') throw new Error('Expected capture request');
+		receive({ type: 'selection', requestId: request.requestId + 1, selection: { anchor: 1, head: 1 } });
+		receive({ type: 'selection', requestId: request.requestId, selection: { anchor: 999, head: -1 } });
+		await expect(captured).resolves.toEqual({ anchor: document.getText().length, head: 0 });
+	});
+
+	it('rejects malformed positions rather than silently switching to an arbitrary cursor', async () => {
+		const { session, ready, receive, postMessage } = createSession();
+		ready();
+		const captured = session.captureSelection();
+		await Promise.resolve();
+		const request = postMessage.mock.calls.map(([message]) => message).find(message => message.type === 'requestSelection')!;
+		if (request.type !== 'requestSelection') throw new Error('Expected capture request');
+		receive({ type: 'selection', requestId: request.requestId, selection: { anchor: NaN, head: 0 } });
+		await expect(captured).rejects.toThrow('invalid cursor position');
+	});
+
+	it('rejects pending requests when the preview closes', async () => {
+		const { session } = createSession();
+		const captured = session.captureSelection();
+		session.dispose();
+		await expect(captured).rejects.toThrow('closed');
+		await expect(session.captureSelection()).rejects.toThrow('closed');
+	});
+
+	it('bounds the wait for a preview that never becomes ready', async () => {
+		vi.useFakeTimers();
+		try {
+			const { session } = createSession();
+			const captured = session.captureSelection();
+			const rejected = expect(captured).rejects.toThrow('did not respond');
+			await vi.advanceTimersByTimeAsync(10_000);
+			await rejected;
+		} finally { vi.useRealTimers(); }
+	});
+});
+
+
+it('rejects an old snapshot when flushed edits require a document resync', async () => {
+	const { session, ready, receive, postMessage } = createSession();
+	ready();
+	const captured = session.captureSelection();
+	const rejected = expect(captured).rejects.toThrow('changed while capturing');
+	await Promise.resolve();
+	const request = postMessage.mock.calls.map(([message]) => message).find(message => message.type === 'requestSelection')!;
+	if (request.type !== 'requestSelection') throw new Error('Expected capture request');
+	receive({ type: 'edit', baseVersion: 6, changes: [{ from: 0, to: 0, insert: 'stale' }] });
+	receive({ type: 'selection', requestId: request.requestId, selection: { anchor: 3, head: 3 } });
+	await rejected;
+});
+
+it('does not bypass pending edits when a queued capture becomes ready', async () => {
+	const { session, ready, receive, postMessage } = createSession();
+	let release!: () => void;
+	const edit = new Promise<void>((resolve) => { release = resolve; });
+	vi.spyOn(session as unknown as { applyEdit: () => Promise<void> }, 'applyEdit').mockReturnValueOnce(edit);
+	receive({ type: 'edit', baseVersion: 7, changes: [] });
+	const captured = session.captureSelection();
+	ready();
+	await Promise.resolve();
+	expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'requestSelection' }));
+	release();
+	await vi.waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'requestSelection' })));
+	const request = postMessage.mock.calls.map(([message]) => message).find(message => message.type === 'requestSelection')!;
+	if (request.type !== 'requestSelection') throw new Error('Expected capture request');
+	receive({ type: 'selection', requestId: request.requestId, selection: { anchor: 3, head: 3 } });
+	await expect(captured).resolves.toEqual({ anchor: 3, head: 3 });
 });

@@ -3,6 +3,7 @@ import { DocumentSyncSession } from './documentSync';
 import { extractHeadings } from '../shared/headings';
 import type { HeadingItem } from '../shared/headings';
 import { escapeAttribute } from '../shared/i18n';
+import type { SelectionOffsets } from '../shared/messages';
 
 export class MarkdownLivePreviewProvider implements vscode.CustomTextEditorProvider {
 	static readonly viewType = 'mdLivePreview.editor';
@@ -77,6 +78,29 @@ export class MarkdownLivePreviewProvider implements vscode.CustomTextEditorProvi
 		const document = await vscode.workspace.openTextDocument(uri);
 		const session = await this.openPreview(document.uri);
 		session.jumpToFragment(fragment);
+	}
+
+	/**
+	 * Open a Markdown preview and restore its primary selection.
+	 * @param uri Markdown document to open.
+	 * @param selection Anchor and head as UTF-16 document offsets.
+	 * @returns Resolves when the session has accepted the selection.
+	 */
+	async openAtSelection(uri: vscode.Uri, selection: SelectionOffsets): Promise<void> {
+		const session = await this.openPreview(uri);
+		session.restoreSelection(selection);
+	}
+
+	/**
+	 * Capture a preview's primary selection after its pending edits settle.
+	 * @param uri Markdown document represented by the preview.
+	 * @param column Editor group containing the preview.
+	 * @returns The primary selection as UTF-16 document offsets.
+	 */
+	async captureSelection(uri: vscode.Uri, column: vscode.ViewColumn): Promise<SelectionOffsets> {
+		const session = this.findSession(uri, column);
+		if (!session) throw new Error('The Markdown preview session could not be found');
+		return session.captureSelection();
 	}
 
 	private async openPreview(uri: vscode.Uri): Promise<DocumentSyncSession> {
