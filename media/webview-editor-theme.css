@@ -70,6 +70,7 @@ html, body {
 	cursor: pointer;
 }
 .mlp-section-fold-toggle svg {
+	opacity: 0.5;
 	width: 18px;
 	height: 18px;
 	fill: none;
@@ -80,6 +81,10 @@ html, body {
 }
 .mlp-section-fold-toggle[aria-expanded="true"] svg {
 	transform: rotate(90deg);
+}
+.mlp-section-fold-toggle:hover svg,
+.mlp-section-fold-toggle:focus-visible svg {
+	opacity: 1;
 }
 .mlp-section-fold-toggle:hover {
 	background: var(--vscode-button-secondaryHoverBackground, #454545);
