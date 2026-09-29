@@ -1,5 +1,5 @@
 import { EditorState, Annotation, type Extension, ChangeSet } from '@codemirror/state';
-import { EditorView, keymap, drawSelection, lineNumbers } from '@codemirror/view';
+import { EditorView, keymap, drawSelection } from '@codemirror/view';
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import {
@@ -34,6 +34,7 @@ import { allowRevealOnce } from './cmUtils';
 import { gitDiffGutter, setGitBase } from './gitDiffGutter';
 import { sectionFolding } from './sectionFolding';
 import { textSelection } from './textSelection';
+import { selectableLineNumbers } from './lineNumberSelection';
 import { findFragmentPosition } from './fragmentNavigation';
 
 const remoteChange = Annotation.define<boolean>();
@@ -131,7 +132,7 @@ function createExtensions(): Extension[] {
 		EditorState.allowMultipleSelections.of(true),
 		drawSelection(),
 		textSelection,
-		lineNumbers(),
+		selectableLineNumbers,
 		gitDiffGutter,
 		sectionFolding,
 		// Search matches the raw Markdown, which is what the file actually holds —
