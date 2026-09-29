@@ -33,6 +33,7 @@ import type { TextChange } from '../shared/messages';
 import { allowRevealOnce } from './cmUtils';
 import { gitDiffGutter, setGitBase } from './gitDiffGutter';
 import { sectionFolding } from './sectionFolding';
+import { textSelection } from './textSelection';
 import { findFragmentPosition } from './fragmentNavigation';
 
 const remoteChange = Annotation.define<boolean>();
@@ -129,6 +130,7 @@ function createExtensions(): Extension[] {
 		// native selection cannot show.
 		EditorState.allowMultipleSelections.of(true),
 		drawSelection(),
+		textSelection,
 		lineNumbers(),
 		gitDiffGutter,
 		sectionFolding,
