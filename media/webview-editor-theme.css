@@ -173,6 +173,18 @@ html, body {
 .cm-selectionBackground {
 	background: var(--vscode-editor-selectionBackground, rgba(120, 160, 255, 0.35)) !important;
 }
+/* A selected hard newline gets one visible cell, not the rest of the row. */
+.mlp-selected-newline::after {
+	content: "↵";
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--vscode-editor-selectionForeground, var(--vscode-editor-foreground, #cccccc));
+	font-size: 0.85em;
+	line-height: 1;
+}
 .cm-content ::selection {
 	background: var(--vscode-editor-selectionBackground, rgba(120, 160, 255, 0.35));
 }
