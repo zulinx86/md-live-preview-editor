@@ -13,6 +13,12 @@
 
 /** Every user-visible webview string, keyed by a stable identifier. */
 const en = {
+	'git.preview': 'Changes since HEAD',
+	'git.before': 'Before (HEAD)',
+	'git.after': 'After (working tree)',
+	'git.close': 'Close changes',
+	'git.empty': 'No lines',
+	'git.noNewline': 'No newline at end of file',
 	'section.collapse': 'Collapse section',
 	'section.expand': 'Expand section',
 	'code.toggle.title': 'Code mode: show the Markdown source and edit it directly',
@@ -122,6 +128,12 @@ const en = {
 export type MessageKey = keyof typeof en;
 
 const ja: Record<MessageKey, string> = {
+	'git.preview': 'HEAD からの変更',
+	'git.before': '変更前 (HEAD)',
+	'git.after': '変更後 (作業ツリー)',
+	'git.close': '差分を閉じる',
+	'git.empty': '行なし',
+	'git.noNewline': 'ファイル末尾に改行なし',
 	'section.collapse': 'セクションを折りたたむ',
 	'section.expand': 'セクションを展開する',
 	'code.toggle.title': 'コードモード：Markdown ソースを表示して直接編集します',
