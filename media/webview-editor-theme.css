@@ -104,6 +104,68 @@ html, body {
 	padding: 0;
 }
 
+.mlp-git-change-button {
+	display: block;
+	width: 7px;
+	height: 100%;
+	min-height: 4px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+}
+.mlp-git-change-button:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder, #007fd4);
+}
+.mlp-git-preview {
+	margin: 4px 0;
+	border: 1px solid var(--vscode-peekView-border, #569cd6);
+	background: var(--vscode-peekViewEditor-background, #202024);
+	color: var(--vscode-editor-foreground, #cccccc);
+	font: var(--vscode-editor-font-size, 14px)/1.5 var(--vscode-editor-font-family, monospace);
+	user-select: text;
+}
+.mlp-git-preview-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 2px 10px;
+	background: var(--vscode-peekViewTitle-background, #252526);
+}
+.mlp-git-preview-close {
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-size: 20px;
+	cursor: pointer;
+}
+.mlp-git-preview-body {
+	max-height: 300px;
+	overflow: auto;
+}
+.mlp-git-preview-pair {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.mlp-git-preview-before, .mlp-git-preview-after {
+	min-width: 0;
+	padding: 6px 10px;
+}
+.mlp-git-preview-before {
+	background: var(--vscode-diffEditor-removedTextBackground, rgba(241, 76, 76, 0.15));
+}
+.mlp-git-preview-after {
+	background: var(--vscode-diffEditor-insertedTextBackground, rgba(129, 184, 139, 0.15));
+}
+.mlp-git-preview-source { overflow-x: auto; }
+.mlp-git-preview-line { display: flex; white-space: pre; min-height: 1.5em; }
+.mlp-git-preview-number { min-width: 3ch; padding-right: 1ch; opacity: 0.55; user-select: none; }
+.mlp-git-preview-note { opacity: 0.7; font-size: 0.85em; }
+@media (max-width: 600px) {
+	.mlp-git-preview-pair { grid-template-columns: minmax(0, 1fr); }
+}
+
 .mlp-git-marker {
 	display: block;
 	width: 3px;
