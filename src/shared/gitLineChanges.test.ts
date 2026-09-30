@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { computeGitLineChanges, type GitLineChange } from './gitLineChanges';
+import { computeGitDiffHunks, computeGitLineChanges, type GitDiffHunk, type GitLineChange } from './gitLineChanges';
 
 const added = (fromLine: number, toLine = fromLine): GitLineChange =>
 	({ fromLine, toLine, kind: 'added' });
@@ -118,5 +118,136 @@ describe('computeGitLineChanges', () => {
 	it('returns no partial markers when the timeout expires', () => {
 		vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValue(1_000);
 		expect(computeGitLineChanges('same\nold', 'same\nnew')).toEqual([]);
+	});
+});
+
+
+describe('computeGitDiffHunks', () => {
+	afterEach(() => vi.restoreAllMocks());
+
+	it.each<[string, string, string, GitDiffHunk]>([
+		['insert at start', 'a\nb', 'x\ny\na\nb', {
+			change: added(1, 2), beforeFromLine: 1, afterFromLine: 1,
+			beforeText: '', afterText: 'x\ny\n',
+		}],
+		['insert at unterminated EOF', 'a', 'a\nb', {
+			change: added(2), beforeFromLine: 2, afterFromLine: 2,
+			beforeText: '', afterText: 'b',
+		}],
+		['expand replacement', 'a\nb\nc', 'a\nx\ny\nc', {
+			change: modified(2, 3), beforeFromLine: 2, afterFromLine: 2,
+			beforeText: 'b\n', afterText: 'x\ny\n',
+		}],
+		['shrink EOF replacement', 'a\nx\ny\n', 'a\nb', {
+			change: modified(2), beforeFromLine: 2, afterFromLine: 2,
+			beforeText: 'x\ny\n', afterText: 'b',
+		}],
+		['delete at start', 'x\na\nb', 'a\nb', {
+			change: deleted(1, 'before'), beforeFromLine: 1, afterFromLine: 1,
+			beforeText: 'x\n', afterText: '',
+		}],
+		['delete in middle', 'a\nx\nb', 'a\nb', {
+			change: deleted(2, 'before'), beforeFromLine: 2, afterFromLine: 2,
+			beforeText: 'x\n', afterText: '',
+		}],
+		['delete at unterminated EOF', 'keep\nremoved', 'keep', {
+			change: deleted(1, 'after'), beforeFromLine: 2, afterFromLine: 2,
+			beforeText: 'removed', afterText: '',
+		}],
+		['delete at terminated EOF', 'keep\nremoved\n', 'keep\n', {
+			change: deleted(1, 'after'), beforeFromLine: 2, afterFromLine: 2,
+			beforeText: 'removed\n', afterText: '',
+		}],
+		['fully emptied document', 'keep\nremoved', '', {
+			change: deleted(1, 'before'), beforeFromLine: 1, afterFromLine: 1,
+			beforeText: 'keep\nremoved', afterText: '',
+		}],
+		['new blank-only document', '', '\n\n', {
+			change: added(1, 2), beforeFromLine: 1, afterFromLine: 1,
+			beforeText: '', afterText: '\n\n',
+		}],
+		['delete actual trailing blank', 'a\n\n', 'a\n', {
+			change: deleted(1, 'after'), beforeFromLine: 2, afterFromLine: 2,
+			beforeText: '\n', afterText: '',
+		}],
+		['add final newline only', 'a\nb', 'a\nb\n', {
+			change: modified(2), beforeFromLine: 2, afterFromLine: 2,
+			beforeText: 'b', afterText: 'b\n',
+		}],
+		['remove final newline only', 'a\nb\n', 'a\nb', {
+			change: modified(2), beforeFromLine: 2, afterFromLine: 2,
+			beforeText: 'b\n', afterText: 'b',
+		}],
+		['normalize mixed CRLF', 'a\r\nold\r\n', 'a\nnew', {
+			change: modified(2), beforeFromLine: 2, afterFromLine: 2,
+			beforeText: 'old\n', afterText: 'new',
+		}],
+		['preserve lone CR and Unicode', 'a\n旧\rvalue', 'a\n新😀\rvalue\n', {
+			change: modified(2), beforeFromLine: 2, afterFromLine: 2,
+			beforeText: '旧\rvalue', afterText: '新😀\rvalue\n',
+		}],
+		['suppress separate EOF newline edit', 'a\nb', 'x\na\nb\n', {
+			change: added(1), beforeFromLine: 1, afterFromLine: 1,
+			beforeText: '', afterText: 'x\n',
+		}],
+	])('%s', (_name, base, current, expected) => {
+		expect(computeGitDiffHunks(base, current)).toEqual([expected]);
+	});
+
+	it('tracks independent source coordinates across separated edits', () => {
+		expect(computeGitDiffHunks('a\nb\nc\nd\ne\nf\ng', 'x\na\nb\nC\nd\nf\ng\ny')).toEqual([
+			{ change: added(1), beforeFromLine: 1, afterFromLine: 1, beforeText: '', afterText: 'x\n' },
+			{ change: modified(4), beforeFromLine: 3, afterFromLine: 4, beforeText: 'c\n', afterText: 'C\n' },
+			{ change: deleted(6, 'before'), beforeFromLine: 5, afterFromLine: 6, beforeText: 'e\n', afterText: '' },
+			{ change: added(8), beforeFromLine: 8, afterFromLine: 8, beforeText: '', afterText: 'y' },
+		]);
+	});
+
+	it('reconstructs terminated documents in both directions, including repeated and blank lines', () => {
+		const documents = [''];
+		let rows: string[][] = [[]];
+		for (let length = 1; length <= 3; length++) {
+			rows = rows.flatMap((prefix) => ['', 'a', 'b'].map((line) => [...prefix, line]));
+			documents.push(...rows.map((lines) => `${lines.join('\n')}\n`));
+		}
+		for (const base of documents) {
+			for (const current of documents) {
+				const hunks = computeGitDiffHunks(base, current);
+				let forward = base;
+				let reverse = current;
+				for (const hunk of [...hunks].reverse()) {
+					const beforeOffset = base.split('\n').slice(0, hunk.beforeFromLine - 1).join('\n').length
+						+ Number(hunk.beforeFromLine > 1);
+					const afterOffset = current.split('\n').slice(0, hunk.afterFromLine - 1).join('\n').length
+						+ Number(hunk.afterFromLine > 1);
+					expect(base.slice(beforeOffset, beforeOffset + hunk.beforeText.length)).toBe(hunk.beforeText);
+					expect(current.slice(afterOffset, afterOffset + hunk.afterText.length)).toBe(hunk.afterText);
+					forward = forward.slice(0, beforeOffset) + hunk.afterText
+						+ forward.slice(beforeOffset + hunk.beforeText.length);
+					reverse = reverse.slice(0, afterOffset) + hunk.beforeText
+						+ reverse.slice(afterOffset + hunk.afterText.length);
+				}
+				expect(forward).toBe(current);
+				expect(reverse).toBe(base);
+				expect(computeGitDiffHunks(base.replace(/\n/g, '\r\n'), current)).toEqual(hunks);
+				expect(computeGitDiffHunks(base, current.replace(/\n/g, '\r\n'))).toEqual(hunks);
+			}
+		}
+	});
+
+	it('returns no hunks for normalized identical or empty documents', () => {
+		expect(computeGitDiffHunks('', '')).toEqual([]);
+		expect(computeGitDiffHunks('a\r\nb\r\n', 'a\nb\n')).toEqual([]);
+	});
+
+	it('returns no hunks when the edit limit is exceeded', () => {
+		vi.spyOn(Date, 'now').mockReturnValue(0);
+		const current = Array.from({ length: 2_001 }, (_, i) => `line ${i}`).join('\n');
+		expect(computeGitDiffHunks('', current)).toEqual([]);
+	});
+
+	it('returns no partial hunks when the timeout expires', () => {
+		vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValue(1_000);
+		expect(computeGitDiffHunks('same\nold', 'same\nnew')).toEqual([]);
 	});
 });
