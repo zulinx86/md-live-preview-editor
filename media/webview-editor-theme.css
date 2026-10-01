@@ -1046,6 +1046,7 @@ table.mlp-frontmatter td pre {
    into a `.mlp-search-row` of its own, so the split is structural — the panel
    stacks two rows, and each row lays its own controls out. */
 .cm-panel.cm-search {
+	width: 40em !important;
 	display: flex !important;
 	flex-direction: column;
 	align-items: stretch;
@@ -1064,6 +1065,12 @@ table.mlp-frontmatter td pre {
 }
 /* Nothing but the text fields may shrink, so a cramped row squeezes its field
    rather than dropping a button out of line. */
+.cm-search .mlp-search-options {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: 4px;
+}
 .cm-search .cm-button,
 .cm-search label {
 	flex: 0 0 auto !important;
@@ -1196,8 +1203,7 @@ table.mlp-frontmatter td pre {
 	align-items: center;
 	justify-content: center;
 	box-sizing: border-box;
-	/* Sized to the glyph rather than fixed square: `Aa` and `│ab│` are different
-	   widths, and clipping either to the same box is what made them unreadable. */
+	/* Let text labels size naturally alongside compact glyphs. */
 	min-width: 22px;
 	height: 22px;
 	margin: 0 !important;
@@ -1218,6 +1224,11 @@ table.mlp-frontmatter td pre {
 	line-height: 1;
 	letter-spacing: 0.02em;
 	pointer-events: none;
+}
+.cm-search .mlp-search-glyph-word {
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	text-decoration-thickness: 1px;
 }
 /* The checkbox stays in the DOM (the panel reads it on commit) but is taken out
    of view; the label is the control now. */

@@ -151,20 +151,10 @@ export function openSearchPanelFocused(view: EditorView): boolean {
  */
 const REPLACE_OPEN_CLASS = 'mlp-search-replace-open';
 
-/**
- * Labels for the find toggles, replacing the library's words.
- *
- * VS Code marks these three with icons; the words themselves ("match case",
- * "regexp", "by word") are long enough to wrap the panel at the widths it
- * usually opens at. Drawn as short text glyphs rather than SVG paths: at 14px a
- * hand-drawn `Aa` is mostly hinting noise, while the font renders the same
- * shapes crisply and scales with the user's editor font size. They are the same
- * shorthand VS Code uses — `Aa` for case, `ab` between word boundaries for
- * whole word, `.*` for regular expressions.
- */
+/** Compact toggle glyphs; an underline marks the whole-word option. */
 const TOGGLE_GLYPHS: Record<string, string> = {
 	case: 'Aa',
-	word: '│ab│',
+	word: 'ab',
 	re: '.*',
 };
 
@@ -228,6 +218,11 @@ function groupSearchRows(panel: HTMLElement): void {
 		}
 		(seenBreak ? replaceRow : findRow).appendChild(child);
 	}
+	// Keep the three options together if a narrow panel needs another row.
+	const options = document.createElement('div');
+	options.className = 'mlp-search-options';
+	for (const label of Array.from(findRow.querySelectorAll('label'))) options.appendChild(label);
+	findRow.appendChild(options);
 	br.remove();
 	panel.insertBefore(replaceRow, panel.firstChild);
 	panel.insertBefore(findRow, replaceRow);
@@ -254,6 +249,7 @@ function iconifyToggles(panel: HTMLElement): void {
 		}
 		const span = document.createElement('span');
 		span.className = 'mlp-search-glyph';
+		if (checkbox.name === 'word') span.classList.add('mlp-search-glyph-word');
 		span.textContent = glyph;
 		span.setAttribute('aria-hidden', 'true');
 		label.appendChild(span);

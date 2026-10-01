@@ -93,3 +93,38 @@ test.describe('find panel', () => {
 		await expect(page.locator('.cm-search')).toHaveCount(0);
 	});
 });
+
+for (const width of [1000, 420]) {
+	test(`search options stay together at viewport width ${width}`, async ({ page }) => {
+		await page.setViewportSize({ width, height: 600 });
+		await mountEditor(page, 'cat catalog bobcat cat');
+		await openSearch(page);
+		const options = page.locator('.mlp-search-options label');
+		await expect(options).toHaveCount(3);
+		const bounds = await options.evaluateAll(labels => labels.map(label => {
+			const box = label.getBoundingClientRect();
+			return { top: box.top, right: box.right };
+		}));
+		expect(Math.max(...bounds.map(b => b.top)) - Math.min(...bounds.map(b => b.top))).toBeLessThan(1);
+		const panel = (await page.locator('.cm-search').boundingBox())!;
+		expect(Math.max(...bounds.map(b => b.right))).toBeLessThan(panel.x + panel.width);
+		if (width === 1000) {
+			const field = (await page.locator('input[name="search"]').boundingBox())!;
+			expect(Math.abs(bounds[0].top - field.y)).toBeLessThan(5);
+		}
+	});
+}
+
+test('underlined ab icon toggles whole-word matching', async ({ page }) => {
+	await mountEditor(page, 'cat catalog bobcat cat');
+	await openSearch(page);
+	await page.locator('input[name="search"]').pressSequentially('cat');
+	const toggle = page.locator('.mlp-search-options label').filter({ hasText: /^ab$/ });
+	await expect(toggle).toBeVisible();
+	await expect(toggle).toHaveAttribute('title', 'Match whole word');
+	await expect(toggle.locator('.mlp-search-glyph')).toHaveCSS('text-decoration-line', 'underline');
+	await expect(page.locator('.cm-searchMatch, .cm-searchMatch-selected')).toHaveCount(4);
+	await toggle.click();
+	await expect(toggle.locator('input')).toBeChecked();
+	await expect(page.locator('.cm-searchMatch, .cm-searchMatch-selected')).toHaveCount(2);
+});
