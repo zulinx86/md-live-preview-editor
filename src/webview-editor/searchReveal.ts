@@ -1,4 +1,4 @@
-import { StateEffect, StateField, type EditorState, type Extension } from '@codemirror/state';
+import { StateEffect, StateField, type EditorState, type Extension, type SelectionRange } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { getSearchQuery, openSearchPanel, searchPanelOpen } from '@codemirror/search';
 import { t } from '../shared/i18n';
@@ -107,6 +107,17 @@ const clearOnPanelClose = EditorView.updateListener.of((update) => {
 
 
 export { setSearchSelection, markingSearchSelection, getSearchQuery };
+
+/** Keep visible search matches in place and center matches outside the viewport. */
+export function scrollToSearchMatch(range: SelectionRange, view: EditorView): StateEffect<unknown> {
+	const first = view.coordsAtPos(range.from, 1);
+	const last = view.coordsAtPos(range.to, -1);
+	const viewport = view.scrollDOM.getBoundingClientRect();
+	const top = Math.max(0, viewport.top);
+	const bottom = Math.min(view.scrollDOM.ownerDocument.defaultView!.innerHeight, viewport.bottom);
+	const visible = first !== null && last !== null && first.top >= top && last.bottom <= bottom;
+	return EditorView.scrollIntoView(range, { y: visible ? 'nearest' : 'center', yMargin: 0 });
+}
 
 /**
  * Opens the find panel and puts the caret in its field.
