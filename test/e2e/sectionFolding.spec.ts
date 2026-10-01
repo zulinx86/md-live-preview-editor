@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { mountEditor, postToWebview } from './harness';
 
 function toggles(page: Page) {
-	return page.locator('.mlp-section-fold-toggle:visible');
+	return page.locator('.mlp-section-fold-toggle[data-fold-kind="section"]:visible');
 }
 
 const nested = 'Intro\n\n## Parent\n\nParent body\n\n### Child\n\nChild body\n\n### Sibling\n\nSibling body\n\n## Outside\n\nOutside body';

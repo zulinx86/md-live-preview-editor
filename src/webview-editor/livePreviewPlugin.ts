@@ -1,5 +1,5 @@
 import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet, WidgetType } from '@codemirror/view';
-import { syntaxTree } from '@codemirror/language';
+import { syntaxTree, foldedRanges } from '@codemirror/language';
 import type { Range, EditorState } from '@codemirror/state';
 import type { SyntaxNode, SyntaxNodeRef } from '@lezer/common';
 import { cursorTouchesRange, blockCursorTouchesRange, noteRevealed } from './cmUtils';
@@ -1373,6 +1373,16 @@ function buildDecorations(view: EditorView): DecorationSet {
 						decorations.push(Decoration.mark({ class: 'mlp-hr' }).range(node.from, node.to));
 						return;
 					case 'FencedCode': {
+						const opening = doc.lineAt(node.from);
+						let collapsed = false;
+						foldedRanges(state).between(opening.to, opening.to, (from, to) => {
+							if (from === opening.to && to === node.to) collapsed = true;
+						});
+						if (collapsed) {
+							// Keep the literal opening fence as the collapsed block's label.
+							decorations.push(Decoration.line({ class: 'mlp-line-code mlp-line-code-first mlp-line-code-last' }).range(opening.from));
+							return false;
+						}
 						const infoNode = node.node.getChild('CodeInfo');
 						const lang = infoNode ? state.sliceDoc(infoNode.from, infoNode.to).trim().toLowerCase() : '';
 						// Must use the same test blockDecorationsField uses to decide
@@ -1518,7 +1528,8 @@ export const livePreviewPlugin = ViewPlugin.fromClass(
 		}
 
 		update(update: ViewUpdate) {
-			if (update.docChanged || update.viewportChanged || update.selectionSet) {
+			if (update.docChanged || update.viewportChanged || update.selectionSet
+				|| foldedRanges(update.startState) !== foldedRanges(update.state)) {
 				this.decorations = buildDecorations(update.view);
 			}
 		}
