@@ -1065,6 +1065,12 @@ table.mlp-frontmatter td pre {
 }
 /* Nothing but the text fields may shrink, so a cramped row squeezes its field
    rather than dropping a button out of line. */
+.cm-search .mlp-search-count {
+	flex: 0 0 auto;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+	opacity: 0.85;
+}
 .cm-search .mlp-search-options {
 	display: inline-flex;
 	flex: 0 0 auto;
