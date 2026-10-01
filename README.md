@@ -91,7 +91,9 @@ Fragment links such as `[Details](#details)` jump to a heading in the current
 preview and center its source position where scrolling permits. Heading IDs use
 GitHub-style slugs, including Japanese text and numbered duplicate headings
 (`details`, `details-1`, ...). Percent-encoded fragments and reference links work
-as well. In a rendered table, use Ctrl/Cmd-click to follow the link.
+as well. Links in rendered tables and frontmatter values open with a normal
+click; Ctrl/Cmd-click also works. Click non-link text to edit the cell or
+frontmatter, or use its source-mode button.
 
 Source line numbers appear in the left gutter. Wrapped text keeps one number per
 source line; hidden fence lines and rendered blocks do not renumber later lines.

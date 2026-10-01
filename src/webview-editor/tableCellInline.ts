@@ -193,3 +193,36 @@ export function renderInlineInto(parent: HTMLElement, text: string, hooks: CellI
 	if (!text) return;
 	renderChildren(parent, inlineRoot(cellParser.parse(text)), text, hooks);
 }
+
+/** Linkify plain value text without interpreting emphasis, images, or other formatting. */
+export function renderLinkedText(parent: HTMLElement, text: string, references: LinkReferences): void {
+	let position = 0;
+	cellParser.parse(text).iterate({
+		enter(ref) {
+			const node = ref.node;
+			if (node.name === 'InlineCode' || node.name === 'FencedCode' || node.name === 'Image' || node.name === 'LinkReference') return false;
+			let href: string;
+			let label: string;
+			if (node.name === 'Link') {
+				const link = resolveMarkdownLink(node, (from, to) => text.slice(from, to), references);
+				if (!link) return;
+				href = link.href;
+				label = text.slice(link.labelFrom, link.labelTo);
+			} else if (node.name === 'Autolink' || node.name === 'URL') {
+				const url = node.name === 'Autolink' ? node.getChild('URL') : node;
+				if (!url) return false;
+				label = text.slice(url.from, url.to);
+				href = autolinkHref(label);
+			} else return;
+			appendText(parent, text.slice(position, node.from));
+			const link = document.createElement('a');
+			link.className = 'mlp-link';
+			link.dataset.href = href;
+			link.textContent = label;
+			parent.appendChild(link);
+			position = node.to;
+			return false;
+		},
+	});
+	appendText(parent, text.slice(position));
+}

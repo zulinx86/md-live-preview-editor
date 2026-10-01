@@ -4,6 +4,8 @@ import { allowRevealOnce } from './cmUtils';
 import { wrapBlockWidget } from './blockWidgetWrap';
 import { withCodeModeButton } from './codeModeButton';
 import { t } from '../shared/i18n';
+import { renderLinkedText } from './tableCellInline';
+import type { LinkReferences } from './markdownLinks';
 
 export interface FrontmatterRange {
 	from: number;
@@ -59,6 +61,7 @@ function enableTextSelection(view: EditorView, element: HTMLElement): void {
 	element.tabIndex = -1;
 	let press: { x: number; y: number } | null = null;
 	element.addEventListener('mousedown', (event) => {
+		if ((event.target as Element | null)?.closest('.mlp-link')) { press = null; return; }
 		press = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
 		if (press) element.focus({ preventScroll: true });
 		// Leave the browser's selection gesture intact, but keep CodeMirror from
@@ -81,18 +84,22 @@ function enableTextSelection(view: EditorView, element: HTMLElement): void {
 
 /** Renders a parsed frontmatter (1+ entries) as a key/value table. */
 export class FrontmatterWidget extends WidgetType {
-	constructor(private readonly entries: Array<[string, unknown]>) {
+	private readonly referenceSignature: string;
+	constructor(private readonly entries: Array<[string, unknown]>, private readonly references: LinkReferences) {
 		super();
+		this.referenceSignature = JSON.stringify([...references]);
 	}
 
 	eq(other: FrontmatterWidget): boolean {
-		return JSON.stringify(other.entries) === JSON.stringify(this.entries);
+		return this.referenceSignature === other.referenceSignature
+			&& JSON.stringify(other.entries) === JSON.stringify(this.entries);
 	}
 
 	toDOM(view: EditorView): HTMLElement {
 		const table = document.createElement('table');
 		table.className = 'mlp-frontmatter';
 		const tbody = document.createElement('tbody');
+		const references = this.references;
 		for (const [key, value] of this.entries) {
 			const tr = document.createElement('tr');
 			const th = document.createElement('th');
@@ -101,10 +108,10 @@ export class FrontmatterWidget extends WidgetType {
 			const formatted = formatValue(value);
 			if (formatted.includes('\n')) {
 				const pre = document.createElement('pre');
-				pre.textContent = formatted;
+				renderLinkedText(pre, formatted, references);
 				td.appendChild(pre);
 			} else {
-				td.textContent = formatted;
+				renderLinkedText(td, formatted, references);
 			}
 			tr.append(th, td);
 			tbody.appendChild(tr);
@@ -116,8 +123,11 @@ export class FrontmatterWidget extends WidgetType {
 		return wrapBlockWidget(withCodeModeButton(view, table, { anchor: table }));
 	}
 
-	ignoreEvent(): boolean {
-		// The widget handles clicks and native text selection itself.
+	ignoreEvent(event: Event): boolean {
+		if (event instanceof MouseEvent && event.button === 0
+			&& (event.type === 'mousedown' || event.type === 'click')
+			&& (event.target as Element | null)?.closest('.mlp-link')) return false;
+		// Other clicks and native text selection remain owned by the widget.
 		return true;
 	}
 }

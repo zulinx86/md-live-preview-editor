@@ -2,6 +2,7 @@ import { StateEffect, StateField, type EditorState, type Range } from '@codemirr
 import { Decoration, DecorationSet, EditorView, ViewPlugin, WidgetType } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { parse as parseYaml } from 'yaml';
+import { getLinkReferences } from './markdownLinks';
 import { MermaidWidget } from './mermaidWidget';
 import { DrawioWidget } from './drawioWidget';
 import { isDiagramLang } from './diagramLang';
@@ -42,7 +43,7 @@ function buildBlockDecorations(state: EditorState): DecorationSet {
 		try {
 			const data = parseYaml(fm.yamlText) ?? {};
 			const entries = Object.entries(data);
-			widget = entries.length === 0 ? new FrontmatterEmptyWidget() : new FrontmatterWidget(entries);
+			widget = entries.length === 0 ? new FrontmatterEmptyWidget() : new FrontmatterWidget(entries, getLinkReferences(state));
 		} catch (err) {
 			widget = new FrontmatterErrorWidget(err instanceof Error ? err.message : String(err));
 		}
