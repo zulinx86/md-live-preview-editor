@@ -2,6 +2,7 @@ import { StateEffect, StateField, type EditorState, type Extension, type Selecti
 import { EditorView } from '@codemirror/view';
 import { getSearchQuery, openSearchPanel, searchPanelOpen } from '@codemirror/search';
 import { t } from '../shared/i18n';
+import { SearchMatchCounter } from './searchMatchCount';
 
 /**
  * Makes a search match reveal the Markdown behind it.
@@ -268,9 +269,31 @@ function iconifyToggles(panel: HTMLElement): void {
 }
 
 
+const searchCounters = new WeakMap<EditorView, SearchMatchCounter>();
+
+function updateMatchCount(view: EditorView, panel: HTMLElement): void {
+	let counter = searchCounters.get(view);
+	if (!counter) searchCounters.set(view, counter = new SearchMatchCounter());
+	let status = panel.querySelector<HTMLElement>('.mlp-search-count');
+	if (!status) {
+		status = document.createElement('span');
+		status.className = 'mlp-search-count';
+		status.setAttribute('role', 'status');
+		status.setAttribute('aria-atomic', 'true');
+		panel.querySelector('input[name="search"]')!.after(status);
+	}
+	const query = getSearchQuery(view.state);
+	status.hidden = !query.search;
+	const { current, total } = counter.count(view.state);
+	const text = query.valid || !query.search
+		? t('search.matchCount', String(current), String(total)) : t('search.invalidPattern');
+	if (status.textContent !== text) status.textContent = text;
+}
+
 function decorateSearchPanel(view: EditorView, panel: HTMLElement): void {
 	iconifyToggles(panel);
 	groupSearchRows(panel);
+	updateMatchCount(view, panel);
 	if (panel.querySelector('.mlp-search-toggle')) return;
 	const toggle = document.createElement('button');
 	toggle.type = 'button';
