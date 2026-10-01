@@ -25,6 +25,7 @@ import { setDrawioFilePoster, handleDrawioFileMessage, clearDrawioFileCache } fr
 import {
 	searchRevealExtension,
 	markingSearchSelection,
+	scrollToSearchMatch,
 	openSearchPanelFocused,
 } from './searchReveal';
 import { t } from '../shared/i18n';
@@ -139,7 +140,7 @@ function createExtensions(): Extension[] {
 		// so `](url)` and a table's pipes are findable even while the preview
 		// hides them. `searchRevealExtension` is what makes a match inside hidden
 		// syntax actually show itself; see that file.
-		search({ top: true }),
+		search({ top: true, scrollToMatch: scrollToSearchMatch }),
 		searchRevealExtension,
 		// The panel builds its own labels, so they are localized through
 		// CodeMirror's phrases facet rather than by rendering them ourselves.
