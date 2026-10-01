@@ -1071,6 +1071,33 @@ table.mlp-frontmatter td pre {
 	font-variant-numeric: tabular-nums;
 	opacity: 0.85;
 }
+.cm-search .mlp-search-navigation {
+	display: inline-flex;
+	flex: 0 0 auto;
+	gap: 2px;
+}
+.cm-search .cm-button.mlp-search-navigation-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0 !important;
+	border-color: transparent !important;
+	background: transparent !important;
+}
+.cm-search .mlp-search-navigation-button svg {
+	width: 16px;
+	height: 16px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.5;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+.cm-search .cm-button.mlp-search-navigation-button:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15)) !important;
+}
 .cm-search .mlp-search-options {
 	display: inline-flex;
 	flex: 0 0 auto;

@@ -128,3 +128,22 @@ test('underlined ab icon toggles whole-word matching', async ({ page }) => {
 	await expect(toggle.locator('input')).toBeChecked();
 	await expect(page.locator('.cm-searchMatch, .cm-searchMatch-selected')).toHaveCount(2);
 });
+
+test('navigation uses up/down icons in previous/next order', async ({ page }) => {
+	await mountEditor(page, 'Intro\n\nneedle needle');
+	await openSearch(page);
+	const buttons = page.locator('.mlp-search-navigation button');
+	await expect(buttons).toHaveCount(2);
+	await expect(buttons.nth(0)).toHaveAttribute('name', 'prev');
+	await expect(buttons.nth(1)).toHaveAttribute('name', 'next');
+	await expect(buttons.nth(0)).toHaveAccessibleName('previous');
+	await expect(buttons.nth(1)).toHaveAccessibleName('next');
+	await expect(buttons.nth(0).locator('svg')).toBeVisible();
+	await expect(buttons.nth(1).locator('svg')).toBeVisible();
+	await expect(buttons).toHaveText(['', '']);
+	await page.locator('input[name="search"]').pressSequentially('needle');
+	await buttons.nth(1).click();
+	await expect(page.locator('.mlp-search-count')).toHaveText('1 of 2');
+	await buttons.nth(0).click();
+	await expect(page.locator('.mlp-search-count')).toHaveText('2 of 2');
+});
