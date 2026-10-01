@@ -687,9 +687,9 @@ class TableWidget extends WidgetType {
 
 		table.addEventListener('mousedown', (event) => {
 			pressedCell = null;
-			// Ctrl/Cmd-click opens a link (createLinkClickHandler) and the secondary
-			// button opens a context menu; neither is ours to take.
-			if (event.ctrlKey || event.metaKey || event.button !== 0) return;
+			// Links use the shared navigation handler; other primary clicks edit cells.
+			if ((event.target as Element | null)?.closest('.mlp-link')
+				|| event.ctrlKey || event.metaKey || event.button !== 0) return;
 			const cell = cellFromPoint(event, table);
 			if (!cell) return;
 			pressedCell = cell;
@@ -726,7 +726,7 @@ class TableWidget extends WidgetType {
 		// The click that follows a handled press has nothing left to do, but it must
 		// not reach CodeMirror either.
 		table.addEventListener('click', (event) => {
-			if (event.ctrlKey || event.metaKey) return;
+			if ((event.target as Element | null)?.closest('.mlp-link') || event.ctrlKey || event.metaKey) return;
 			if (cellFromPoint(event, table)) {
 				event.preventDefault();
 				event.stopPropagation();
@@ -854,9 +854,9 @@ class TableWidget extends WidgetType {
 		return wrapBlockWidget(wrap);
 	}
 	ignoreEvent(event: Event): boolean {
-		// Let modified link clicks reach the editor's shared link handler.
+		// Let primary link clicks reach the editor's shared link handler.
 		if (event instanceof MouseEvent && (event.type === 'mousedown' || event.type === 'click') &&
-			(event.ctrlKey || event.metaKey) && event.button === 0 &&
+			event.button === 0 &&
 			(event.target as HTMLElement | null)?.closest('.mlp-link')) return false;
 		// Every event the rendered table handles itself — text selection, cell
 		// clicks, and typing into a `contenteditable` cell — has to reach the DOM

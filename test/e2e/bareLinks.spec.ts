@@ -20,8 +20,8 @@ for (const source of ['https://example.com/a?x=1#part', '<https://example.com/a>
 			await mountEditor(page, `Intro\n\n${content}\n\nAfter`);
 			const link = page.locator('.mlp-link');
 			await expect(link).toHaveText(label);
-			// Tables reserve a plain click for editing the cell.
-			await link.click({ modifiers: table ? ['ControlOrMeta'] : [] });
+			// Rendered links use the same primary-click behavior in body and table.
+			await link.click();
 			await expect.poll(() => page.evaluate(() => (window as any).__posted.filter((message: any) => message.type === 'openLink'))).toEqual([{ type: 'openLink', href }]);
 		});
 	}
