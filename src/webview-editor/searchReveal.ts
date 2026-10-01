@@ -230,11 +230,15 @@ function groupSearchRows(panel: HTMLElement): void {
 		}
 		(seenBreak ? replaceRow : findRow).appendChild(child);
 	}
-	// Keep the three options together if a narrow panel needs another row.
+	// Keep the search options inside the same input border as the query.
 	const options = document.createElement('div');
 	options.className = 'mlp-search-options';
 	for (const label of Array.from(findRow.querySelectorAll('label'))) options.appendChild(label);
-	findRow.appendChild(options);
+	const input = findRow.querySelector<HTMLInputElement>('input[name="search"]')!;
+	const inputGroup = document.createElement('div');
+	inputGroup.className = 'mlp-search-input';
+	input.before(inputGroup);
+	inputGroup.append(input, options);
 	br.remove();
 	panel.insertBefore(replaceRow, panel.firstChild);
 	panel.insertBefore(findRow, replaceRow);
@@ -280,7 +284,7 @@ function updateMatchCount(view: EditorView, panel: HTMLElement): void {
 		status.className = 'mlp-search-count';
 		status.setAttribute('role', 'status');
 		status.setAttribute('aria-atomic', 'true');
-		panel.querySelector('input[name="search"]')!.after(status);
+		panel.querySelector('.mlp-search-input')!.after(status);
 	}
 	const query = getSearchQuery(view.state);
 	status.hidden = !query.search;

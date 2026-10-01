@@ -1065,6 +1065,28 @@ table.mlp-frontmatter td pre {
 }
 /* Nothing but the text fields may shrink, so a cramped row squeezes its field
    rather than dropping a button out of line. */
+.cm-search .mlp-search-input {
+	display: flex;
+	align-items: center;
+	flex: 1 1 12em;
+	min-width: 12em;
+	box-sizing: border-box;
+	padding-right: 3px;
+	border: 1px solid var(--vscode-input-border, transparent);
+	border-radius: 2px;
+	background: var(--vscode-input-background, rgba(127, 127, 127, 0.15));
+	color: var(--vscode-input-foreground, inherit);
+}
+.cm-search .mlp-search-input:focus-within {
+	border-color: var(--vscode-focusBorder, #007fd4);
+}
+.cm-search .mlp-search-input .cm-textfield {
+	min-width: 0 !important;
+	width: 0 !important;
+	border: 0 !important;
+	background: transparent !important;
+	outline: none !important;
+}
 .cm-search .mlp-search-count {
 	flex: 0 0 auto;
 	white-space: nowrap;
@@ -1194,7 +1216,7 @@ table.mlp-frontmatter td pre {
 	width: auto !important;
 }
 
-.cm-search .cm-textfield:focus,
+.cm-search input[name="replace"]:focus,
 .cm-dialog .cm-textfield:focus {
 	border-color: var(--vscode-focusBorder, #007fd4) !important;
 	outline: 1px solid var(--vscode-focusBorder, #007fd4) !important;
