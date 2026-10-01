@@ -147,3 +147,11 @@ test('navigation uses up/down icons in previous/next order', async ({ page }) =>
 	await buttons.nth(0).click();
 	await expect(page.locator('.mlp-search-count')).toHaveText('2 of 2');
 });
+
+test('omits select-all matches while retaining replace-all', async ({ page }) => {
+	await mountEditor(page, 'Intro\n\nneedle needle');
+	await openSearch(page);
+	await expect(page.locator('.cm-search button[name="select"]')).toHaveCount(0);
+	await page.locator('.mlp-search-toggle').click();
+	await expect(page.locator('button[name="replaceAll"]')).toBeVisible();
+});

@@ -319,6 +319,7 @@ function decorateSearchNavigation(panel: HTMLElement): void {
 }
 
 function decorateSearchPanel(view: EditorView, panel: HTMLElement): void {
+	panel.querySelector('button[name="select"]')?.remove();
 	iconifyToggles(panel);
 	groupSearchRows(panel);
 	updateMatchCount(view, panel);
