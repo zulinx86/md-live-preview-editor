@@ -61,7 +61,9 @@ export class OutlineViewProvider implements vscode.WebviewViewProvider {
 	private refresh(): void {
 		if (!this.view) return;
 		const headings = this.editorProvider.getActiveHeadings();
-		const message: HostToOutlineMessage = headings ? { type: 'update', headings } : { type: 'noDocument' };
+		const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+		const documentUri = input instanceof vscode.TabInputCustom ? input.uri.toString() : undefined;
+		const message: HostToOutlineMessage = headings ? { type: 'update', headings, documentUri } : { type: 'noDocument' };
 		void this.view.webview.postMessage(message);
 	}
 

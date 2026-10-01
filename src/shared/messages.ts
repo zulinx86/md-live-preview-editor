@@ -103,7 +103,7 @@ export type PreviewToHostMessage = { type: 'ready' };
 
 // Outline (heading list) sidebar view.
 export type HostToOutlineMessage =
-	| { type: 'update'; headings: HeadingItem[] }
+	| { type: 'update'; headings: HeadingItem[]; documentUri?: string }
 	// No Markdown Live Preview panel is currently active (none open, or focus
 	// moved away from any of them).
 	| { type: 'noDocument' };
