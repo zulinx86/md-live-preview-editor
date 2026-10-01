@@ -155,3 +155,33 @@ test('omits select-all matches while retaining replace-all', async ({ page }) =>
 	await page.locator('.mlp-search-toggle').click();
 	await expect(page.locator('button[name="replaceAll"]')).toBeVisible();
 });
+
+for (const width of [1000, 420, 320]) {
+	test(`query and options share an input frame (${width}px)`, async ({ page }) => {
+		await page.setViewportSize({ width, height: 600 });
+		await mountEditor(page, 'Intro\n\nneedle needle');
+		await openSearch(page);
+		await page.locator('input[name="search"]').pressSequentially('needle');
+		const frame = (await page.locator('.mlp-search-input').boundingBox())!;
+		const input = (await page.locator('input[name="search"]').boundingBox())!;
+		const options = (await page.locator('.mlp-search-options').boundingBox())!;
+		expect(options.x).toBeGreaterThanOrEqual(input.x + input.width - 1);
+		expect(options.x + options.width).toBeLessThanOrEqual(frame.x + frame.width);
+		expect(input.width).toBeGreaterThan(25);
+		await expect(page.locator('.mlp-search-input .mlp-search-count')).toHaveCount(0);
+		await expect(page.locator('.mlp-search-input .mlp-search-navigation')).toHaveCount(0);
+		await expect(page.locator('.mlp-search-input label')).toHaveCount(3);
+		await page.locator('.mlp-search-toggle').click();
+		await expect(page.locator('input[name="replace"]')).toBeVisible();
+	});
+}
+
+test('focused search uses one outer frame without an inner input outline', async ({ page }) => {
+	await mountEditor(page, 'Intro\n\nneedle');
+	await openSearch(page);
+	const input = page.locator('input[name="search"]');
+	await input.focus();
+	await expect(input).toHaveCSS('outline-style', 'none');
+	await expect(input).toHaveCSS('border-top-width', '0px');
+	await expect(page.locator('.mlp-search-input')).toHaveCSS('border-top-color', 'rgb(0, 127, 212)');
+});
