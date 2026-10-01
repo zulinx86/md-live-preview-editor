@@ -52,6 +52,8 @@ const en = {
 	'table.addRow': 'Add a row',
 	'table.addColumn': 'Add a column',
 
+	'outline.collapse': 'Collapse heading',
+	'outline.expand': 'Expand heading',
 	'outline.empty': 'No headings.',
 	'outline.untitled': '(untitled heading)',
 	'outline.noDocument': 'Open a Markdown Live Preview document to see its headings here.',
@@ -169,6 +171,8 @@ const ja: Record<MessageKey, string> = {
 	'table.addRow': '行を追加',
 	'table.addColumn': '列を追加',
 
+	'outline.collapse': '見出しを折りたたむ',
+	'outline.expand': '見出しを展開する',
 	'outline.empty': '見出しがありません。',
 	'outline.untitled': '(無題の見出し)',
 	'outline.noDocument': 'Markdown Live Preview を開くと、ここに見出し一覧が表示されます。',
