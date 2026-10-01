@@ -290,10 +290,39 @@ function updateMatchCount(view: EditorView, panel: HTMLElement): void {
 	if (status.textContent !== text) status.textContent = text;
 }
 
+/** Keep the native search buttons and handlers, replacing only their presentation. */
+function decorateSearchNavigation(panel: HTMLElement): void {
+	if (panel.querySelector('.mlp-search-navigation')) return;
+	const previous = panel.querySelector<HTMLButtonElement>('button[name="prev"]');
+	const next = panel.querySelector<HTMLButtonElement>('button[name="next"]');
+	if (!previous || !next) return;
+	const group = document.createElement('span');
+	group.className = 'mlp-search-navigation';
+	next.before(group);
+	for (const [button, path] of [
+		[previous, 'M8 13V3 M3 8l5-5 5 5'],
+		[next, 'M8 3v10 M3 8l5 5 5-5'],
+	] as const) {
+		const label = button.textContent?.trim() ?? '';
+		button.title = label;
+		button.setAttribute('aria-label', label);
+		button.classList.add('mlp-search-navigation-button');
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('viewBox', '0 0 16 16');
+		svg.setAttribute('aria-hidden', 'true');
+		const arrow = document.createElementNS(svg.namespaceURI, 'path');
+		arrow.setAttribute('d', path);
+		svg.appendChild(arrow);
+		button.replaceChildren(svg);
+		group.appendChild(button);
+	}
+}
+
 function decorateSearchPanel(view: EditorView, panel: HTMLElement): void {
 	iconifyToggles(panel);
 	groupSearchRows(panel);
 	updateMatchCount(view, panel);
+	decorateSearchNavigation(panel);
 	if (panel.querySelector('.mlp-search-toggle')) return;
 	const toggle = document.createElement('button');
 	toggle.type = 'button';
