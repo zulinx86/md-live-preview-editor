@@ -165,7 +165,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		vscode.window.registerWebviewViewProvider(StyleManagerViewProvider.viewType, styleManagerProvider),
 	);
 
-	const outlineProvider = new OutlineViewProvider(context, provider);
+	const outlineProvider = new OutlineViewProvider(context, provider, styleStore);
 	context.subscriptions.push(vscode.window.registerWebviewViewProvider(OutlineViewProvider.viewType, outlineProvider));
 
 	context.subscriptions.push(
