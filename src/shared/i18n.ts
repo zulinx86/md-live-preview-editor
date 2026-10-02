@@ -13,6 +13,7 @@
 
 /** Every user-visible webview string, keyed by a stable identifier. */
 const en = {
+	'references.expand': 'Show reference definitions ({0} hidden lines)',
 	'git.preview': 'Changes since HEAD',
 	'git.before': 'Before (HEAD)',
 	'git.after': 'After (working tree)',
@@ -134,6 +135,7 @@ const en = {
 export type MessageKey = keyof typeof en;
 
 const ja: Record<MessageKey, string> = {
+	'references.expand': '参照定義を表示 ({0} 行を非表示)',
 	'git.preview': 'HEAD からの変更',
 	'git.before': '変更前 (HEAD)',
 	'git.after': '変更後 (作業ツリー)',
