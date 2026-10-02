@@ -4,6 +4,7 @@ import { gutter, GutterMarker } from '@codemirror/view';
 import { getSectionRanges, sectionAtLine } from './sectionRanges';
 import { t } from '../shared/i18n';
 import { getCodeBlockRanges } from './codeBlockRanges';
+import { ReferenceDefinitionsMarker, ReferenceDefinitionsWidget } from './referenceDefinitionsWidget';
 import { cursorTouchesRange } from './cmUtils';
 
 type FoldKind = 'section' | 'code';
@@ -96,12 +97,17 @@ export const sectionFolding: Extension = [
 			if (!target) return null;
 			return markers[target.kind][foldedRange(view.state, target.from) ? 'collapsed' : 'expanded'];
 		},
+		widgetMarker(_view, widget) {
+			return widget instanceof ReferenceDefinitionsWidget
+				? new ReferenceDefinitionsMarker(widget.from, widget.lines) : null;
+		},
 		lineMarkerChange: update => update.docChanged || update.selectionSet
 			|| foldedRanges(update.startState) !== foldedRanges(update.state)
 			|| update.startState.facet(language) !== update.state.facet(language),
 		domEventHandlers: {
 			mousedown: (_view, _line, event) => { event.preventDefault(); return true; },
-			click(view, line) {
+			click(view, line, event) {
+				if ((event.target as Element).closest('.mlp-reference-definitions-toggle')) return true;
 				const target = targetAtLine(view.state, line.from);
 				if (!target) return false;
 				const folded = foldedRange(view.state, target.from);

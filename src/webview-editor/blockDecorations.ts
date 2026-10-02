@@ -2,12 +2,13 @@ import { StateEffect, StateField, type EditorState, type Range } from '@codemirr
 import { Decoration, DecorationSet, EditorView, ViewPlugin, WidgetType } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { parse as parseYaml } from 'yaml';
+import { ReferenceDefinitionsWidget } from './referenceDefinitionsWidget';
 import { getLinkReferences } from './markdownLinks';
 import { MermaidWidget } from './mermaidWidget';
 import { DrawioWidget } from './drawioWidget';
 import { isDiagramLang } from './diagramLang';
 import { buildTableWidget, isLineAligned, alignedBlockRange } from './livePreviewPlugin';
-import { blockCursorTouchesRange, noteRevealed, onPointerRelease } from './cmUtils';
+import { cursorTouchesRange, blockCursorTouchesRange, noteRevealed, onPointerRelease } from './cmUtils';
 import { detectFrontmatter, FrontmatterWidget, FrontmatterEmptyWidget, FrontmatterErrorWidget } from './frontmatterWidget';
 
 /**
@@ -21,6 +22,7 @@ import { detectFrontmatter, FrontmatterWidget, FrontmatterEmptyWidget, Frontmatt
 function buildBlockDecorations(state: EditorState): DecorationSet {
 	const decorations: Range<Decoration>[] = [];
 	const tree = syntaxTree(state);
+	const references: { from: number; to: number; parentFrom: number; parentTo: number }[] = [];
 
 	// Frontmatter has no dedicated `@lezer/markdown` node, so it's detected by a
 	// plain line scan (see frontmatterWidget.ts) rather than via tree.iterate()
@@ -53,6 +55,20 @@ function buildBlockDecorations(state: EditorState): DecorationSet {
 	tree.iterate({
 		enter: (node) => {
 			if (fm && node.from >= fm.from && node.to <= fm.to) return false;
+			if (node.name === 'LinkReference') {
+				// Group neighboring definitions, including blank lines between them,
+				// without merging across list items or blockquote boundaries.
+				// Quote prefixes may occur between definitions in the same container.
+				const parent = node.node.parent!;
+				const previous = references.at(-1);
+				if (previous && previous.parentFrom === parent.from && previous.parentTo === parent.to &&
+					/^[\s>]*$/.test(state.sliceDoc(previous.to, node.from))) {
+					previous.to = node.to;
+				} else {
+					references.push({ from: node.from, to: node.to, parentFrom: parent.from, parentTo: parent.to });
+				}
+				return false;
+			}
 			if (node.name === 'FencedCode') {
 				const infoNode = node.node.getChild('CodeInfo');
 				const lang = infoNode ? state.sliceDoc(infoNode.from, infoNode.to).trim().toLowerCase() : '';
@@ -83,6 +99,14 @@ function buildBlockDecorations(state: EditorState): DecorationSet {
 		},
 	});
 
+	for (const { from, to } of references) {
+		// A click, caret, or search match reveals the whole group for editing.
+		if (cursorTouchesRange(state, from, to)) continue;
+		const lines = state.doc.lineAt(to).number - state.doc.lineAt(from).number + 1;
+		decorations.push(Decoration.replace({
+			widget: new ReferenceDefinitionsWidget(from, lines), block: true,
+		}).range(from, to));
+	}
 	return Decoration.set(decorations, true);
 }
 
