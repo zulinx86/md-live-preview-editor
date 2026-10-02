@@ -1,6 +1,7 @@
 import type { HostToOutlineMessage, OutlineToHostMessage } from '../shared/messages';
 import type { HeadingItem } from '../shared/headings';
 import { t } from '../shared/i18n';
+import { HeadingColors } from './headingColors';
 
 interface OutlineState { collapsed: Array<[string, string[]]>; }
 
@@ -17,6 +18,7 @@ function post(message: OutlineToHostMessage): void {
 }
 
 const root = document.getElementById('mlp-outline-root')!;
+const headingColors = new HeadingColors(root, root.dataset.editorTheme);
 const collapsedByDocument = new Map<string, Set<string>>(
 	(api.getState()?.collapsed ?? []).map(([uri, keys]) => [uri, new Set(keys)]),
 );
@@ -84,7 +86,8 @@ function renderHeadings(headings: HeadingItem[], documentUri: string): void {
 		label.addEventListener('click', () => post({ type: 'jumpToHeading', line: heading.line }));
 		if (hasChildren) {
 			const children = item.appendChild(document.createElement('ul'));
-			children.className = 'mlp-outline-list';
+			children.className = 'mlp-outline-list mlp-outline-children';
+			children.style.setProperty('--mlp-outline-guide', `var(--mlp-outline-h${heading.level})`);
 			const button = control as HTMLButtonElement;
 			button.type = 'button';
 			button.dataset.key = key;
@@ -125,6 +128,7 @@ window.addEventListener('message', (event: MessageEvent<HostToOutlineMessage>) =
 	const message = event.data;
 	switch (message.type) {
 		case 'update':
+			headingColors.update(message.css ?? '');
 			renderHeadings(message.headings, message.documentUri ?? '');
 			break;
 		case 'noDocument':

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import type { HostToOutlineMessage, OutlineToHostMessage } from '../shared/messages';
 import type { MarkdownLivePreviewProvider } from '../editor/MarkdownLivePreviewProvider';
 import { escapeAttribute } from '../shared/i18n';
+import type { StyleStore } from './styleStore';
 
 const REFRESH_DEBOUNCE_MS = 150;
 
@@ -14,10 +15,12 @@ export class OutlineViewProvider implements vscode.WebviewViewProvider {
 	constructor(
 		private readonly context: vscode.ExtensionContext,
 		private readonly editorProvider: MarkdownLivePreviewProvider,
+		private readonly styleStore: StyleStore,
 	) {
 		this.context.subscriptions.push(
 			vscode.window.tabGroups.onDidChangeTabs(() => this.scheduleRefresh()),
 			vscode.workspace.onDidChangeTextDocument(() => this.scheduleRefresh()),
+			styleStore.onDidChange(() => this.scheduleRefresh()),
 		);
 	}
 
@@ -63,7 +66,7 @@ export class OutlineViewProvider implements vscode.WebviewViewProvider {
 		const headings = this.editorProvider.getActiveHeadings();
 		const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
 		const documentUri = input instanceof vscode.TabInputCustom ? input.uri.toString() : undefined;
-		const message: HostToOutlineMessage = headings ? { type: 'update', headings, documentUri } : { type: 'noDocument' };
+		const message: HostToOutlineMessage = headings ? { type: 'update', headings, documentUri, css: this.styleStore.getCombinedCssSync() } : { type: 'noDocument' };
 		void this.view.webview.postMessage(message);
 	}
 
@@ -72,6 +75,7 @@ export class OutlineViewProvider implements vscode.WebviewViewProvider {
 		const styleUri = webview.asWebviewUri(
 			vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview-outline-style.css'),
 		);
+		const editorThemeUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview-editor-theme.css'));
 		const nonce = getNonce();
 
 		return `<!DOCTYPE html>
@@ -83,7 +87,7 @@ export class OutlineViewProvider implements vscode.WebviewViewProvider {
 	<title>Outline</title>
 </head>
 <body>
-	<div id="mlp-outline-root"></div>
+	<div id="mlp-outline-root" data-editor-theme="${escapeAttribute(editorThemeUri.toString())}"></div>
 	<script nonce="${nonce}">
 		window.mlpLocale = ${JSON.stringify(vscode.env.language)};
 	</script>

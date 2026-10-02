@@ -10,9 +10,9 @@ const headings: HeadingItem[] = [
 	{ level: 3, text: 'Sibling', line: 7 },
 	{ level: 2, text: 'Next', line: 9 },
 ];
-async function update(page: Page, items = headings, documentUri = 'file:///one.md') {
+async function update(page: Page, items = headings, documentUri = 'file:///one.md', css?: string) {
 	await page.evaluate(message => window.dispatchEvent(new MessageEvent('message', { data: message })), {
-		type: 'update', headings: items, documentUri,
+		type: 'update', headings: items, documentUri, css,
 	});
 }
 async function mount(page: Page, savedState?: unknown) {
@@ -116,4 +116,41 @@ test('restores folds after the outline webview is recreated', async ({ page }) =
 	await mount(page, saved);
 	await expect(heading(page, 'Child')).toBeHidden();
 	await expect(toggle(page, 'Parent')).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('outline headings and vertical guides follow the active heading palette', async ({ page }) => {
+	await update(page, headings, 'file:///one.md', 'h2 { color: #89decf; } h3 { color: #a8c7fa; } h4 { color: #c8b6ef; }');
+	await expect(heading(page, 'Parent')).toHaveCSS('color', 'rgb(137, 222, 207)');
+	await expect(heading(page, 'Child')).toHaveCSS('color', 'rgb(168, 199, 250)');
+	const guide = page.locator('.mlp-outline-children').first();
+	expect(await guide.evaluate(e => getComputedStyle(e, '::before').borderLeftColor)).toBe('rgb(137, 222, 207)');
+	expect(await guide.evaluate(e => getComputedStyle(e, '::before').borderLeftWidth)).toBe('1px');
+	await toggle(page, 'Parent').click();
+	await update(page, headings, 'file:///one.md', 'h2 { color: #f1809e; }');
+	await expect(heading(page, 'Parent')).toHaveCSS('color', 'rgb(241, 128, 158)');
+	await expect(heading(page, 'Child')).toBeHidden();
+});
+
+test('palette supports CSS variables and theme classes without applying layout rules', async ({ page }) => {
+	await page.evaluate(() => document.body.classList.add('vscode-dark'));
+	const css = ':root { --heading: #a8c7fa; } body { color: #c5c5c5; } body.vscode-dark h2 { color: var(--heading); } body.vscode-light h2 { color: #f1809e; } button { font-size: 90px; }';
+	await update(page, headings, 'file:///one.md', css);
+	await expect(heading(page, 'Parent')).toHaveCSS('color', 'rgb(168, 199, 250)');
+	await expect(heading(page, 'Child')).toHaveCSS('color', 'rgb(197, 197, 197)');
+	await expect(heading(page, 'Parent')).not.toHaveCSS('font-size', '90px');
+	await page.evaluate(() => { document.body.className = 'vscode-light'; });
+	await expect(heading(page, 'Parent')).toHaveCSS('color', 'rgb(241, 128, 158)');
+});
+
+test('palette preserves root specificity and editor ancestor selectors', async ({ page }) => {
+	await update(page, headings, 'file:///one.md', ':root { --h: red; } html { --h: blue; } #mlp-root .cm-scroller h2 { color: var(--h); }');
+	await expect(heading(page, 'Parent')).toHaveCSS('color', 'rgb(255, 0, 0)');
+});
+
+test('palette follows theme attribute changes', async ({ page }) => {
+	await page.evaluate(() => { document.body.className = 'vscode-dark'; document.body.dataset.vscodeThemeName = 'First'; });
+	await update(page, headings, 'file:///one.md', 'body.vscode-dark[data-vscode-theme-name="First"] h2 { color: red; } body.vscode-dark[data-vscode-theme-name="Second"] h2 { color: blue; }');
+	await expect(heading(page, 'Parent')).toHaveCSS('color', 'rgb(255, 0, 0)');
+	await page.evaluate(() => { document.body.dataset.vscodeThemeName = 'Second'; });
+	await expect(heading(page, 'Parent')).toHaveCSS('color', 'rgb(0, 0, 255)');
 });
