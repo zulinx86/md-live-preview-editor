@@ -208,7 +208,7 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "^26.6.2",
     "@types/vscode": "^1.90.0",
-    "@vitest/coverage-v8": "^5.0.2",
+    "@vitest/coverage-v8": "^5.0.3",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0",
